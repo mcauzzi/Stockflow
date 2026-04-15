@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/Docs/">
+    <File Path=".\Docs\ARCHITECTURE_StockFlow_v0.3.md" />
+    <File Path=".\Docs\GDD_StockFlow_v0.2.md" />
+  </Folder>
+  <Folder Name="/SimulationEngine/">
+    <Project Path="./Sources/Stockflow.Protocol/Stockflow.Protocol.csproj" />
+    <Project Path="./Sources/Stockflow.Simulation/Stockflow.Simulation.csproj" />
+  </Folder>
+  <Folder Name="/Tests/" />
+  <Folder Name="/WebServer/">
+    <Project Path="./Sources/Stockflow.Webserver/Stockflow.Webserver.csproj" />
+  </Folder>
+</Solution>
