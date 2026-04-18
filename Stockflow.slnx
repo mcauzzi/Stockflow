@@ -2,6 +2,7 @@
   <Folder Name="/Docs/">
     <File Path=".\Docs\ARCHITECTURE_StockFlow_v0.3.md" />
     <File Path=".\Docs\GDD_StockFlow_v0.2.md" />
+    <File Path=".\Docs\SIMULATION_ENGINE_v0.1.md" />
   </Folder>
   <Folder Name="/SimulationEngine/">
     <Project Path="./Sources/Stockflow.Protocol/Stockflow.Protocol.csproj" />
