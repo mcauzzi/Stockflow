@@ -7,8 +7,11 @@
     <Project Path="./Sources/Stockflow.Protocol/Stockflow.Protocol.csproj" />
     <Project Path="./Sources/Stockflow.Simulation/Stockflow.Simulation.csproj" />
   </Folder>
-  <Folder Name="/Tests/" />
+  <Folder Name="/Tests/">
+    <Project Path="./Sources/Stockflow.Tests.Simulation/Stockflow.Tests.Simulation.csproj" />
+  </Folder>
   <Folder Name="/WebServer/">
     <Project Path="./Sources/Stockflow.Webserver/Stockflow.Webserver.csproj" />
+    <Project Path="Sources/Stockflow.Persistence/Stockflow.Persistence.csproj" />
   </Folder>
 </Solution>
