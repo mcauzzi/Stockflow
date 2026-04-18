@@ -10,4 +10,10 @@
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.4"/>
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\Stockflow.Persistence\Stockflow.Persistence.csproj" />
+      <ProjectReference Include="..\Stockflow.Protocol\Stockflow.Protocol.csproj" />
+      <ProjectReference Include="..\Stockflow.Simulation\Stockflow.Simulation.csproj" />
+    </ItemGroup>
+
 </Project>
