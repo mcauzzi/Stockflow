@@ -4,24 +4,47 @@ Stato attuale dell'implementazione del motore di simulazione (`Sources/Stockflow
 
 ---
 
-## Panoramica
-
-Il motore è una **class library zero-dependency** (nessun NuGet, nessun framework ASP.NET). Tutta la logica di simulazione vive qui; i layer superiori (Webserver, Persistence) sono read-only rispetto allo stato.
+## Struttura cartelle
 
 ```
-SimulationEngine
-  └── SimulationState
-        ├── GridManager          ← spazio fisico 3D
-        └── List<ISimComponent>  ← componenti attivi
+Stockflow.Simulation/
+├── Core/
+│   ├── SimulationEngine.cs
+│   ├── SimulationState.cs
+│   └── StateDelta.cs
+├── Commands/
+│   ├── ICommand.cs
+│   └── CommandResult.cs
+├── Component/
+│   ├── ISimComponent.cs
+│   ├── OneWayConveyor.cs
+│   ├── ComponentType.cs
+│   ├── Direction.cs
+│   ├── DirectionExtensions.cs
+│   ├── Port.cs
+│   ├── PortId.cs
+│   └── PortDirection.cs
+├── Entity/
+│   └── ISimEntity.cs
+├── Grid/
+│   ├── Cell.cs          (contiene anche GridManager)
+│   └── GridCoord.cs
+├── Modules/
+│   └── IComponentModule.cs
+└── Routing/
+    ├── RoutingGraph.cs
+    └── Connection.cs
 ```
-
-Il loop di tick è esterno all'engine: il chiamante invoca `Tick()` alla frequenza desiderata (tipicamente 20 Hz).
 
 ---
 
-## SimulationEngine
+## Core
 
-**File:** `SimulationEngine.cs`
+### SimulationEngine
+
+**File:** `Core/SimulationEngine.cs` — namespace `Stockflow.Simulation.Core`
+
+Cuore del sistema. C# puro, zero dipendenze da framework.
 
 ```csharp
 public class SimulationEngine(int width, int length, int height)
@@ -29,31 +52,72 @@ public class SimulationEngine(int width, int length, int height)
 
 | Membro | Tipo | Descrizione |
 |---|---|---|
-| `Timescale` | `float` | Moltiplicatore velocità (1 = normale, 2 = doppio) |
-| `State` | `SimulationState` | Stato corrente della simulazione |
-| `Tick()` | `void` | Avanza la simulazione di un passo |
+| `TimeScale` | `float` | Moltiplicatore velocità (1 = normale, 2 = doppio) |
+| `SimulationTime` | `float` | Tempo simulato accumulato in secondi |
+| `Grid` | `GridManager` | Infrastruttura spaziale — piazzamento e lookup componenti |
+| `State` | `SimulationState` | Snapshot osservabile corrente |
+| `Tick(deltaTime)` | `void` | Avanza la simulazione di un passo |
+| `ProcessCommand(cmd)` | `CommandResult` | Esegue un comando; i tipi concreti si aggiungono in #33 |
+| `GetStateDelta()` | `StateDelta` | Differenze rispetto all'ultima chiamata |
 
-### Calcolo deltaTime
+**Separazione delle responsabilità:**
+- `Grid` è macchinario interno dell'engine (infrastruttura spaziale, non snapshot)
+- `State` è lo snapshot osservabile da serializzare e trasmettere ai client
 
+**Calcolo deltaTime — responsabilità del caller:**
+
+```csharp
+// In SimulationHostedService (Webserver)
+engine.Tick(1f / tickRate * engine.TimeScale);
 ```
-deltaTime = BaseTickDuration × Timescale
-BaseTickDuration = 1/20 s  (costante, 20 Hz nominali)
-```
 
-Con `Timescale = 2` il tempo simulato avanza il doppio per ogni tick reale.
+L'engine non conosce il tick rate reale; lo riceve già calcolato. Questo permette al server di variare frequenza e velocità indipendentemente.
 
----
+**GetStateDelta — semantica:**
 
-## SimulationState
+Traccia internamente l'insieme di ID componenti noti. Ad ogni chiamata restituisce gli ID aggiunti e rimossi rispetto alla chiamata precedente. Verrà espanso con entità (issue #6) e delta completo (issue #8).
 
-**File:** `SimulationState.cs`
+### SimulationState
 
-Contenitore immutabile dello stato. Creato da `SimulationEngine` e non sostituito durante la vita dell'engine.
+**File:** `Core/SimulationState.cs` — namespace `Stockflow.Simulation.Core`
+
+Snapshot osservabile dello stato corrente. Contiene solo ciò che è rilevante per i client.
 
 | Membro | Tipo | Descrizione |
 |---|---|---|
-| `Grid` | `GridManager` | Griglia 3D del magazzino |
 | `Components` | `List<ISimComponent>` | Tutti i componenti attivi |
+
+### StateDelta
+
+**File:** `Core/StateDelta.cs` — namespace `Stockflow.Simulation.Core`
+
+Differenze tra due tick consecutivi. Struttura in espansione progressiva.
+
+| Membro | Tipo | Descrizione |
+|---|---|---|
+| `SimulationTime` | `float` | Tempo simulato al momento del delta |
+| `AddedComponentIds` | `IReadOnlyList<int>` | ID componenti aggiunti dall'ultimo delta |
+| `RemovedComponentIds` | `IReadOnlyList<int>` | ID componenti rimossi dall'ultimo delta |
+
+---
+
+## Commands
+
+### ICommand
+
+**File:** `Commands/ICommand.cs`
+
+Interfaccia marker per tutti i comandi interni alla simulazione. Il server traduce i `ClientMessage` (Protocol) in `ICommand` prima di passarli all'engine — la simulazione non dipende mai dal layer di rete.
+
+### CommandResult
+
+**File:** `Commands/CommandResult.cs`
+
+```csharp
+public readonly record struct CommandResult(bool Success, string? ErrorMessage = null)
+```
+
+Factory methods: `CommandResult.Ok()` e `CommandResult.Fail(string why)`.
 
 ---
 
@@ -80,23 +144,23 @@ Una singola cella della griglia. Può ospitare al massimo un `ISimComponent`.
 | Membro | Tipo | Descrizione |
 |---|---|---|
 | `Coord` | `GridCoord` | Posizione nella griglia (immutabile) |
-| `Component` | `ISimComponent?` | Componente presente sulla cella, `null` se vuota |
+| `Component` | `ISimComponent?` | Componente presente, `null` se vuota |
 | `IsOccupied` | `bool` | `true` se `Component != null` |
 
 ### GridManager
 
-**File:** `Grid/Cell.cs`
+**File:** `Grid/Cell.cs` — esposto da `SimulationEngine.Grid`
 
-Griglia tridimensionale `Width × Length × Height` di celle. Asse semantico: X = colonne, Y = righe, Floor = piani.
+Griglia tridimensionale `Width × Length × Height`. Appartiene all'engine, non allo state.
 
-| Membro | Descrizione |
+| Metodo | Descrizione |
 |---|---|
 | `IsInBounds(coord)` | Verifica che la coordinata sia dentro i limiti |
 | `TryGetCell(coord, out cell)` | Restituisce la cella se la coordinata è valida |
-| `TryPlace(component)` | Piazza il componente sulla cella corrispondente a `component.Position`; fallisce se fuori bounds o occupata |
-| `TryRemove(coord)` | Rimuove il componente dalla cella; fallisce se la cella è vuota |
+| `TryPlace(component)` | Piazza il componente sulla cella corrispondente a `component.Position`; fallisce se occupata o fuori bounds |
+| `TryRemove(coord)` | Rimuove il componente dalla cella; fallisce se vuota |
 
-Tutti i metodi sono **non-throwing**: usano il pattern `Try*` per comunicare il fallimento.
+Tutti i metodi usano il pattern `Try*` — non throwing.
 
 ---
 
@@ -106,19 +170,17 @@ Tutti i metodi sono **non-throwing**: usano il pattern `Try*` per comunicare il 
 
 **File:** `Component/ISimComponent.cs`
 
-Interfaccia che ogni componente fisico del magazzino deve implementare.
-
 | Membro | Tipo | Descrizione |
 |---|---|---|
 | `Id` | `int` | Identificatore univoco |
 | `Position` | `GridCoord` | Cella occupata nella griglia |
-| `Facing` | `Direction` | Direzione verso cui è orientato il componente |
-| `Type` | `ComponentType` | Tipo (costante sulla classe concreta) |
+| `Facing` | `Direction` | Orientamento del componente |
+| `Type` | `ComponentType` | Costante sulla classe concreta |
 | `Modules` | `IReadOnlyList<IComponentModule>` | Moduli comportamentali aggiuntivi |
 | `Occupant` | `ISimEntity?` | Entità attualmente sul componente |
 | `Ports` | `IReadOnlyList<Port>` | Porte fisiche di ingresso/uscita |
-| `Tick(deltaTime)` | `void` | Logica interna, chiamata ogni tick |
-| `TryAccept(entity, fromPort)` | `bool` | Tenta di accettare un'entità; `false` se il componente è occupato |
+| `Tick(deltaTime)` | `void` | Logica interna per tick |
+| `TryAccept(entity, fromPort)` | `bool` | Tenta di accettare un'entità |
 
 ### Direction
 
@@ -128,11 +190,9 @@ Interfaccia che ogni componente fisico del magazzino deve implementare.
 public enum Direction { North, East, South, West }
 ```
 
-Metodi di estensione disponibili:
-
 | Metodo | Risultato |
 |---|---|
-| `ToOffset()` | `GridCoord` con offset unitario nella direzione |
+| `ToOffset()` | `GridCoord` offset unitario nella direzione |
 | `Opposite()` | Direzione opposta |
 | `RotateCW()` | Rotazione 90° orario |
 | `RotateCCW()` | Rotazione 90° antiorario |
@@ -145,17 +205,7 @@ Metodi di estensione disponibili:
 public readonly record struct Port(PortId Id, GridCoord Position, PortDirection Direction)
 ```
 
-Porta fisica di un componente. `Position` è la cella su cui si affaccia (adiacente al componente). `Direction` può essere `In`, `Out` o `Bidirectional`.
-
-### PortId
-
-**File:** `Component/PortId.cs`
-
-```csharp
-public readonly record struct PortId(int Index)
-```
-
-Wrapper tipizzato attorno a un indice intero. Evita di confondere ID di porte con altri `int`.
+`Position` è la cella su cui si affaccia la porta (adiacente al componente). `Direction`: `In`, `Out`, `Bidirectional`.
 
 ### ComponentType
 
@@ -165,13 +215,13 @@ Wrapper tipizzato attorno a un indice intero. Evita di confondere ID di porte co
 public enum ComponentType { OneWayConveyor }
 ```
 
-Enum dei tipi di componente disponibili. Ogni classe concreta restituisce il proprio valore come costante (non configurabile a runtime).
+Ogni classe concreta restituisce il proprio tipo come proprietà costante (`Type => ComponentType.OneWayConveyor`), non configurabile via costruttore.
 
 ### OneWayConveyor
 
 **File:** `Component/OneWayConveyor.cs`
 
-Componente nastro trasportatore unidirezionale. Trasporta un'entità dall'ingresso all'uscita in base alla propria velocità e orientamento.
+Nastro trasportatore unidirezionale. Trasporta un'entità dall'ingresso all'uscita.
 
 ```csharp
 public OneWayConveyor(int id, GridCoord position, Direction facing, float speed,
@@ -179,15 +229,15 @@ public OneWayConveyor(int id, GridCoord position, Direction facing, float speed,
 ```
 
 **Porte generate automaticamente:**
-- `InPort` (Id=0): cella opposta alla direzione di `Facing`
+- `InPort` (Id=0): cella opposta a `Facing`
 - `OutPort` (Id=1): cella nella direzione di `Facing`
 
 **Logica di tick:**
-1. Se non c'è occupante: nessuna operazione.
-2. Se `Progress < 1.0`: incrementa `Progress += Speed × deltaTime`.
-3. Se `Progress >= 1.0`: tenta di trasferire l'entità al componente successivo via `RoutingGraph`. Se il trasferimento ha successo, notifica i moduli con `OnEntityExit` e libera il componente.
+1. Nessun occupante → nessuna operazione.
+2. `Progress < 1.0` → `Progress += Speed × deltaTime`.
+3. `Progress >= 1.0` → tenta trasferimento via `RoutingGraph`. Se ha successo: notifica `OnEntityExit` ai moduli, libera il componente.
 
-`Speed` è espresso in "unità di progresso per secondo simulato" (1.0 = attraversamento completo in 1 secondo con `Timescale = 1`).
+`Speed` è in "unità di progresso per secondo simulato".
 
 ---
 
@@ -204,21 +254,19 @@ public readonly record struct Connection(
 )
 ```
 
-Descrive un collegamento diretto tra la porta di uscita di un componente e la porta di ingresso di un altro.
-
 ### RoutingGraph
 
 **File:** `Routing/RoutingGraph.cs`
 
-Grafo diretto che mappa `(componente, porta di uscita) → Connection`. Usato dai componenti durante il tick per sapere a chi passare l'entità.
+Mappa `(ISimComponent, PortId) → Connection`. Usato dai componenti nel tick per sapere a chi passare l'entità.
 
 | Metodo | Descrizione |
 |---|---|
 | `Connect(from, fromPort, to, toPort)` | Aggiunge o sovrascrive un collegamento |
-| `Disconnect(component, port)` | Rimuove il collegamento in uscita da quella porta |
-| `GetNext(component, outPort)` | Restituisce la `Connection?` collegata a quella porta di uscita |
+| `Disconnect(component, port)` | Rimuove il collegamento in uscita |
+| `GetNext(component, outPort)` | Restituisce `Connection?` collegata a quella porta |
 
-Un componente può avere al massimo **una connessione per porta di uscita** (il grafo non supporta fanout).
+Max una connessione per porta di uscita (no fanout).
 
 ---
 
@@ -228,18 +276,16 @@ Un componente può avere al massimo **una connessione per porta di uscita** (il 
 
 **File:** `Entity/ISimEntity.cs`
 
-Interfaccia per qualsiasi oggetto che si muove attraverso i componenti.
-
 | Membro | Tipo | Descrizione |
 |---|---|---|
 | `Id` | `int` | Identificatore univoco (init-only) |
-| `CurrentComponent` | `ISimComponent` | Componente su cui si trova attualmente |
-| `CurrentPort` | `PortId` | Porta dal quale è arrivata nel componente corrente |
-| `Progress` | `float` | Avanzamento sul componente corrente: `0.0` = ingresso, `1.0` = uscita |
-| `DestinationComponent` | `ISimComponent?` | Destinazione finale (usata per routing futuro) |
+| `CurrentComponent` | `ISimComponent` | Componente corrente |
+| `CurrentPort` | `PortId` | Porta di arrivo nel componente corrente |
+| `Progress` | `float` | Avanzamento: `0.0` ingresso → `1.0` uscita |
+| `DestinationComponent` | `ISimComponent?` | Destinazione finale |
 | `EntryTime` | `float` | Tempo simulato di ingresso nel sistema (init-only) |
 
-Nessuna implementazione concreta esiste ancora — è il prossimo pezzo da costruire.
+Nessuna implementazione concreta — issue #6.
 
 ---
 
@@ -249,13 +295,11 @@ Nessuna implementazione concreta esiste ancora — è il prossimo pezzo da costr
 
 **File:** `Modules/IComponentModule.cs`
 
-Sistema plugin per aggiungere comportamenti a un componente senza sottoclassarlo.
-
 | Metodo | Quando viene chiamato |
 |---|---|
-| `OnEntityEnter(entity)` | Quando un'entità accetta l'ingresso nel componente (`TryAccept` con successo) |
-| `OnEntityExit(entity)` | Quando un'entità viene trasferita al componente successivo |
-| `OnTick(deltaTime)` | Ogni tick (*non ancora chiamato — da implementare*) |
+| `OnEntityEnter(entity)` | `TryAccept` con successo |
+| `OnEntityExit(entity)` | Trasferimento al componente successivo |
+| `OnTick(deltaTime)` | Ogni tick (*non ancora invocato — da implementare*) |
 
 ---
 
@@ -267,10 +311,13 @@ Sistema plugin per aggiungere comportamenti a un componente senza sottoclassarlo
 | `GridManager` + `Cell` + `GridCoord` | Implementato |
 | `ISimComponent` + `OneWayConveyor` | Implementato |
 | `RoutingGraph` + `Connection` | Implementato |
+| `ICommand` + `CommandResult` | Implementati |
+| `StateDelta` (struttura base) | Implementata |
 | `IComponentModule` (interfaccia) | Implementata; `OnTick` non ancora invocato |
-| `ISimEntity` (interfaccia) | Definita; nessuna classe concreta |
-| Entità in `SimulationState` | Mancante |
-| Spawn / despawn entità | Mancante |
-| Clock di simulazione (`ElapsedTime`) | Mancante |
-| Logica routing con `DestinationComponent` | Mancante |
-| `RoutingGraph` centralizzato in `SimulationState` | Mancante |
+| `ISimEntity` (interfaccia) | Definita; nessuna classe concreta — issue #6 |
+| `EntityManager` | Mancante — issue #6 |
+| Entità in `SimulationState` | Mancante — issue #6 |
+| `SimulationClock` | Mancante — issue #5 |
+| Delta completo (entità + componenti) | Parziale — issue #8 |
+| Comandi concreti | Mancanti — issue #33 |
+| Logica routing con `DestinationComponent` | Mancante — issue #28 |
