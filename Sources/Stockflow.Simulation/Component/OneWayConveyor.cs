@@ -1,0 +1,72 @@
+using Stockflow.Simulation.Entity;
+using Stockflow.Simulation.Grid;
+using Stockflow.Simulation.Modules;
+using Stockflow.Simulation.Routing;
+
+namespace Stockflow.Simulation.Component;
+
+public class OneWayConveyor : ISimComponent
+{
+    public  int                             Id       { get; }
+    public  GridCoord                       Position { get; }
+    public  Direction                       Facing   { get; }
+    public  ComponentType                   Type     => ComponentType.OneWayConveyor;
+    public  IReadOnlyList<IComponentModule> Modules  { get; }
+    public  ISimEntity?                     Occupant { get; private set; }
+    private Port                            InPort   { get; }
+    private Port                            OutPort  { get; }
+    public  IReadOnlyList<Port>             Ports    { get; }
+    public  float                           Speed    { get; }
+    public  RoutingGraph                    Graph    { get; }
+
+    public OneWayConveyor(int          id,    GridCoord position, Direction facing, float speed,
+                          RoutingGraph graph, IReadOnlyList<IComponentModule>? modules = null)
+    {
+        Id       = id;
+        Position = position;
+        Facing   = facing;
+        Modules  = modules ?? [];
+        Speed    = speed;
+        Graph    = graph;
+        InPort   = new(new(0), Position+Facing.Opposite().ToOffset(), PortDirection.In);
+        OutPort  = new(new(1), Position+Facing.ToOffset(), PortDirection.Out);
+        Ports    = [InPort, OutPort];
+    }
+
+    public void Tick(float deltaTime)
+    {
+        if (Occupant == null) return;
+        if (Occupant.Progress < 1.0f)
+        {
+            Occupant.Progress += Speed * deltaTime;
+        }
+        else
+        {
+            var next = Graph.GetNext(this, OutPort.Id);
+            if (next != null)
+            {
+                var nextComp = next.Value.To;
+                if (nextComp.TryAccept(Occupant, next.Value.ToPort))
+                {
+                    foreach (var module in Modules)
+                        module.OnEntityExit(Occupant);
+                    Occupant = null;
+                }
+            }    
+        }
+    }
+
+    public bool TryAccept(ISimEntity entity, PortId fromPort)
+    {
+        if (Occupant != null) return false;
+        Occupant = entity;
+        entity.CurrentComponent = this;
+        entity.CurrentPort      = fromPort;
+        entity.Progress         = 0.0f;
+
+        foreach (var module in Modules)
+            module.OnEntityEnter(entity);
+
+        return true;
+    }
+}
