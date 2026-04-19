@@ -86,6 +86,13 @@ Stockflow.Webserver
 
 Issues tracked at `mcauzzi/Stockflow`. Organised by milestone: F0 (foundations, current), F1A–D, F2, F3.
 
+**Branch workflow:** main is kept up to date via rebase. Always create feature branches from `origin/main` after a `git fetch`:
+
+```bash
+git fetch origin main
+git checkout -b claude/issue-N-short-desc origin/main
+```
+
 ### Documentation
 
 Detailed design documents (in Italian) are in `Docs/`:
