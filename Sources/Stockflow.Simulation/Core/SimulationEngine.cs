@@ -5,24 +5,25 @@ namespace Stockflow.Simulation.Core;
 
 public class SimulationEngine
 {
-    private float        _simulationTime;
     private HashSet<int> _knownComponentIds = new();
 
     public SimulationEngine(int width, int length, int height)
     {
+        Clock = new SimulationClock();
         Grid  = new GridManager(width, length, height);
         State = new();
     }
 
-    public float           TimeScale      { get; set; } = 1f;
-    public float           SimulationTime => _simulationTime;
+    public SimulationClock Clock          { get; }
+    public float           TimeScale      { get => Clock.TimeScale; set => Clock.TimeScale = value; }
+    public float           SimulationTime => Clock.SimulatedTime;
     public GridManager     Grid           { get; }
     public SimulationState State          { get; }
 
     // deltaTime è calcolato dal caller: 1f / tickRate * engine.TimeScale
     public void Tick(float deltaTime)
     {
-        _simulationTime += deltaTime;
+        Clock.Advance(deltaTime);
         foreach (var component in State.Components)
             component.Tick(deltaTime);
     }
@@ -45,7 +46,7 @@ public class SimulationEngine
 
         return new StateDelta
         {
-            SimulationTime      = _simulationTime,
+            SimulationTime      = Clock.SimulatedTime,
             AddedComponentIds   = added,
             RemovedComponentIds = removed,
         };
