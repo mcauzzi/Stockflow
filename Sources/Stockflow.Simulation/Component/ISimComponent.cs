@@ -12,14 +12,14 @@ public interface ISimComponent
     Direction                       Facing   { get; }
     ComponentType                   Type     { get; }
     IReadOnlyList<IComponentModule> Modules  { get; }
-    ISimEntity?                     Occupant    { get; }
+    SimEntity?                      Occupant { get; }
     // Porte attraverso cui le entità entrano/escono
     IReadOnlyList<Port> Ports { get; }
-    
+
     // Chiamato ogni tick — gestisce logica interna
     // (es. il traslo muove le forche, l'accumulo decide se rilasciare)
     void Tick(float deltaTime);
-    
+
     // Un'entità arriva a una porta
-    bool TryAccept(ISimEntity entity, PortId fromPort);
+    bool TryAccept(SimEntity entity, PortId fromPort);
 }

@@ -1,0 +1,38 @@
+using Stockflow.Simulation.Component;
+
+namespace Stockflow.Simulation.Entity;
+
+public class SimEntity
+{
+    public int     Id        { get; internal set; }
+    public string  Sku       { get; internal set; } = "";
+    public float   Weight    { get; internal set; }
+    public float   Size      { get; internal set; }
+    public float   EntryTime { get; internal set; }
+
+    // Posizione corrente
+    public ISimComponent  CurrentComponent     { get; set; } = null!;
+    public PortId         CurrentPort          { get; set; }
+    public float          Progress             { get; set; }   // 0.0 ingresso → 1.0 uscita
+
+    // Destinazione
+    public ISimComponent? DestinationComponent { get; set; }
+
+    // Stato macchina
+    public EntityStatus Status { get; set; }
+
+    // Resetta tutti i campi per il riuso dal pool
+    internal void Reset()
+    {
+        Id                   = 0;
+        Sku                  = "";
+        Weight               = 0f;
+        Size                 = 0f;
+        EntryTime            = 0f;
+        CurrentComponent     = null!;
+        CurrentPort          = default;
+        Progress             = 0f;
+        DestinationComponent = null;
+        Status               = EntityStatus.Idle;
+    }
+}

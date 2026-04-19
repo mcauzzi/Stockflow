@@ -1,4 +1,5 @@
 using Stockflow.Simulation.Commands;
+using Stockflow.Simulation.Entity;
 using Stockflow.Simulation.Grid;
 
 namespace Stockflow.Simulation.Core;
@@ -6,6 +7,7 @@ namespace Stockflow.Simulation.Core;
 public class SimulationEngine
 {
     private HashSet<int> _knownComponentIds = new();
+    private HashSet<int> _knownEntityIds    = new();
 
     public SimulationEngine(int width, int length, int height)
     {
@@ -34,21 +36,28 @@ public class SimulationEngine
         return CommandResult.Fail($"Unknown command: {command.GetType().Name}");
     }
 
-    // Ritorna le differenze rispetto all'ultima chiamata — verrà espanso con entità (#6, #8)
+    // Ritorna le differenze rispetto all'ultima chiamata — verrà espanso con delta completo (#8)
     public StateDelta GetStateDelta()
     {
-        var current = State.Components.Select(c => c.Id).ToHashSet();
+        var currentComponents = State.Components.Select(c => c.Id).ToHashSet();
+        var addedComponents   = currentComponents.Except(_knownComponentIds).ToList();
+        var removedComponents = _knownComponentIds.Except(currentComponents).ToList();
+        _knownComponentIds = currentComponents;
 
-        var added   = current.Except(_knownComponentIds).ToList();
-        var removed = _knownComponentIds.Except(current).ToList();
-
-        _knownComponentIds = current;
+        var currentEntities = State.Entities.GetAll().ToDictionary(e => e.Id);
+        var addedEntities   = currentEntities.Keys.Except(_knownEntityIds)
+                                             .Select(id => EntityState.From(currentEntities[id]))
+                                             .ToList();
+        var removedEntities = _knownEntityIds.Except(currentEntities.Keys).ToList();
+        _knownEntityIds = currentEntities.Keys.ToHashSet();
 
         return new StateDelta
         {
             SimulationTime      = Clock.SimulatedTime,
-            AddedComponentIds   = added,
-            RemovedComponentIds = removed,
+            AddedComponentIds   = addedComponents,
+            RemovedComponentIds = removedComponents,
+            AddedEntityStates   = addedEntities,
+            RemovedEntityIds    = removedEntities,
         };
     }
 }
