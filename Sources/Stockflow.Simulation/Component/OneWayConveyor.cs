@@ -12,7 +12,7 @@ public class OneWayConveyor : ISimComponent
     public  Direction                       Facing   { get; }
     public  ComponentType                   Type     => ComponentType.OneWayConveyor;
     public  IReadOnlyList<IComponentModule> Modules  { get; }
-    public  ISimEntity?                     Occupant { get; private set; }
+    public  SimEntity?                      Occupant { get; private set; }
     private Port                            InPort   { get; }
     private Port                            OutPort  { get; }
     public  IReadOnlyList<Port>             Ports    { get; }
@@ -52,11 +52,11 @@ public class OneWayConveyor : ISimComponent
                         module.OnEntityExit(Occupant);
                     Occupant = null;
                 }
-            }    
+            }
         }
     }
 
-    public bool TryAccept(ISimEntity entity, PortId fromPort)
+    public bool TryAccept(SimEntity entity, PortId fromPort)
     {
         if (Occupant != null) return false;
         Occupant = entity;

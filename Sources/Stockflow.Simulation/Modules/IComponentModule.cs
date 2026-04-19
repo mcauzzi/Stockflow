@@ -4,7 +4,7 @@ namespace Stockflow.Simulation.Modules;
 
 public interface IComponentModule
 {
-    void OnEntityEnter(ISimEntity entity);
-    void OnEntityExit(ISimEntity  entity);
-    void OnTick(float         deltaTime);
+    void OnEntityEnter(SimEntity entity);
+    void OnEntityExit(SimEntity  entity);
+    void OnTick(float            deltaTime);
 }
