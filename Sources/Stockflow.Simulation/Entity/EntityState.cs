@@ -2,8 +2,9 @@ using Stockflow.Simulation.Component;
 
 namespace Stockflow.Simulation.Entity;
 
-// Snapshot serializzabile per sincronizzazione di rete — solo tipi primitivi
-public sealed class EntityState
+// Snapshot serializzabile per sincronizzazione di rete — solo tipi primitivi.
+// Record per equality strutturale: due snapshot uguali campo per campo sono identici.
+public sealed record EntityState
 {
     public int          Id                 { get; init; }
     public string       Sku                { get; init; } = "";
