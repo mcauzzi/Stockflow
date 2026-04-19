@@ -10,29 +10,20 @@ public class SimEntity
     public float   Size      { get; internal set; }
     public float   EntryTime { get; internal set; }
 
-    // Posizione corrente
     public ISimComponent  CurrentComponent     { get; set; } = null!;
     public PortId         CurrentPort          { get; set; }
     public float          Progress             { get; set; }   // 0.0 ingresso → 1.0 uscita
 
-    // Destinazione
     public ISimComponent? DestinationComponent { get; set; }
 
-    // Stato macchina
     public EntityStatus Status { get; set; }
 
-    // Resetta tutti i campi per il riuso dal pool
+    // Rilascia i riferimenti per non trattenere oggetti vivi mentre l'entità è nel pool.
+    // I campi value-type vengono riscritti integralmente da Spawn al prossimo riuso.
     internal void Reset()
     {
-        Id                   = 0;
         Sku                  = "";
-        Weight               = 0f;
-        Size                 = 0f;
-        EntryTime            = 0f;
         CurrentComponent     = null!;
-        CurrentPort          = default;
-        Progress             = 0f;
         DestinationComponent = null;
-        Status               = EntityStatus.Idle;
     }
 }

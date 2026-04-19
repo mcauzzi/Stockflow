@@ -44,12 +44,19 @@ public class SimulationEngine
         var removedComponents = _knownComponentIds.Except(currentComponents).ToList();
         _knownComponentIds = currentComponents;
 
-        var currentEntities = State.Entities.GetAll().ToDictionary(e => e.Id);
-        var addedEntities   = currentEntities.Keys.Except(_knownEntityIds)
-                                             .Select(id => EntityState.From(currentEntities[id]))
-                                             .ToList();
-        var removedEntities = _knownEntityIds.Except(currentEntities.Keys).ToList();
-        _knownEntityIds = currentEntities.Keys.ToHashSet();
+        var currentEntities = State.Entities.Active;
+        var addedEntities   = new List<EntityState>();
+        foreach (var (id, entity) in currentEntities)
+            if (_knownEntityIds.Add(id))
+                addedEntities.Add(EntityState.From(entity));
+
+        var removedEntities = new List<int>();
+        _knownEntityIds.RemoveWhere(id =>
+        {
+            if (currentEntities.ContainsKey(id)) return false;
+            removedEntities.Add(id);
+            return true;
+        });
 
         return new StateDelta
         {
