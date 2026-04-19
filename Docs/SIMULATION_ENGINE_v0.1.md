@@ -10,6 +10,7 @@ Stato attuale dell'implementazione del motore di simulazione (`Sources/Stockflow
 Stockflow.Simulation/
 ├── Core/
 │   ├── SimulationEngine.cs
+│   ├── SimulationClock.cs
 │   ├── SimulationState.cs
 │   └── StateDelta.cs
 ├── Commands/
@@ -25,7 +26,10 @@ Stockflow.Simulation/
 │   ├── PortId.cs
 │   └── PortDirection.cs
 ├── Entity/
-│   └── ISimEntity.cs
+│   ├── SimEntity.cs      (in Entity.cs)
+│   ├── EntityStatus.cs
+│   ├── EntityState.cs
+│   └── EntityManager.cs
 ├── Grid/
 │   ├── Cell.cs          (contiene anche GridManager)
 │   └── GridCoord.cs
@@ -52,8 +56,9 @@ public class SimulationEngine(int width, int length, int height)
 
 | Membro | Tipo | Descrizione |
 |---|---|---|
-| `TimeScale` | `float` | Moltiplicatore velocità (1 = normale, 2 = doppio) |
-| `SimulationTime` | `float` | Tempo simulato accumulato in secondi |
+| `Clock` | `SimulationClock` | Gestione del tempo simulato |
+| `TimeScale` | `float` | Proxy per `Clock.TimeScale` — moltiplicatore velocità |
+| `SimulationTime` | `float` | Proxy per `Clock.SimulatedTime` — tempo accumulato in secondi |
 | `Grid` | `GridManager` | Infrastruttura spaziale — piazzamento e lookup componenti |
 | `State` | `SimulationState` | Snapshot osservabile corrente |
 | `Tick(deltaTime)` | `void` | Avanza la simulazione di un passo |
@@ -61,6 +66,7 @@ public class SimulationEngine(int width, int length, int height)
 | `GetStateDelta()` | `StateDelta` | Differenze rispetto all'ultima chiamata |
 
 **Separazione delle responsabilità:**
+- `Clock` gestisce il tempo simulato; l'engine espone `TimeScale` e `SimulationTime` come proxy per retrocompatibilità col webserver
 - `Grid` è macchinario interno dell'engine (infrastruttura spaziale, non snapshot)
 - `State` è lo snapshot osservabile da serializzare e trasmettere ai client
 
@@ -75,7 +81,20 @@ L'engine non conosce il tick rate reale; lo riceve già calcolato. Questo permet
 
 **GetStateDelta — semantica:**
 
-Traccia internamente l'insieme di ID componenti noti. Ad ogni chiamata restituisce gli ID aggiunti e rimossi rispetto alla chiamata precedente. Verrà espanso con entità (issue #6) e delta completo (issue #8).
+Traccia internamente gli insiemi di ID componenti e ID entità noti. Ad ogni chiamata restituisce aggiunte e rimozioni rispetto alla chiamata precedente. Verrà espanso con delta completo (issue #8).
+
+### SimulationClock
+
+**File:** `Core/SimulationClock.cs` — namespace `Stockflow.Simulation.Core`
+
+Gestisce il tempo simulato in modo indipendente dall'engine.
+
+| Membro | Tipo | Descrizione |
+|---|---|---|
+| `SimulatedTime` | `float` | Tempo simulato accumulato in secondi |
+| `TimeScale` | `float` | Moltiplicatore velocità: 1x, 2x, 5x, 10x |
+| `IsLiveMode` | `bool` | `true` quando `TimeScale == 1f`; Phase 2: bloccato con connessioni WMS attive |
+| `Advance(realDelta)` | `void` | `SimulatedTime += realDelta * TimeScale` |
 
 ### SimulationState
 
@@ -86,6 +105,7 @@ Snapshot osservabile dello stato corrente. Contiene solo ciò che è rilevante p
 | Membro | Tipo | Descrizione |
 |---|---|---|
 | `Components` | `List<ISimComponent>` | Tutti i componenti attivi |
+| `Entities` | `EntityManager` | Gestione CRUD e query delle entità attive |
 
 ### StateDelta
 
@@ -98,6 +118,8 @@ Differenze tra due tick consecutivi. Struttura in espansione progressiva.
 | `SimulationTime` | `float` | Tempo simulato al momento del delta |
 | `AddedComponentIds` | `IReadOnlyList<int>` | ID componenti aggiunti dall'ultimo delta |
 | `RemovedComponentIds` | `IReadOnlyList<int>` | ID componenti rimossi dall'ultimo delta |
+| `AddedEntityStates` | `IReadOnlyList<EntityState>` | Snapshot delle entità entrate nel sistema dall'ultimo delta |
+| `RemovedEntityIds` | `IReadOnlyList<int>` | ID delle entità uscite dal sistema dall'ultimo delta |
 
 ---
 
@@ -177,10 +199,10 @@ Tutti i metodi usano il pattern `Try*` — non throwing.
 | `Facing` | `Direction` | Orientamento del componente |
 | `Type` | `ComponentType` | Costante sulla classe concreta |
 | `Modules` | `IReadOnlyList<IComponentModule>` | Moduli comportamentali aggiuntivi |
-| `Occupant` | `ISimEntity?` | Entità attualmente sul componente |
+| `Occupant` | `SimEntity?` | Entità attualmente sul componente |
 | `Ports` | `IReadOnlyList<Port>` | Porte fisiche di ingresso/uscita |
 | `Tick(deltaTime)` | `void` | Logica interna per tick |
-| `TryAccept(entity, fromPort)` | `bool` | Tenta di accettare un'entità |
+| `TryAccept(entity, fromPort)` | `bool` | Tenta di accettare una `SimEntity` |
 
 ### Direction
 
@@ -272,20 +294,66 @@ Max una connessione per porta di uscita (no fanout).
 
 ## Entità
 
-### ISimEntity
+### SimEntity
 
-**File:** `Entity/ISimEntity.cs`
+**File:** `Entity/Entity.cs` — namespace `Stockflow.Simulation.Entity`
+
+Unità di carico che si muove attraverso i componenti. Classe concreta senza interfaccia — le entità sono puri data carrier, nessuna variazione comportamentale.
 
 | Membro | Tipo | Descrizione |
 |---|---|---|
-| `Id` | `int` | Identificatore univoco (init-only) |
+| `Id` | `int` | Identificatore univoco assegnato da `EntityManager` |
+| `Sku` | `string` | Codice articolo |
+| `Weight` | `float` | Peso in kg |
+| `Size` | `float` | Dimensione (unità generiche) |
+| `EntryTime` | `float` | Tempo simulato di ingresso nel sistema |
 | `CurrentComponent` | `ISimComponent` | Componente corrente |
 | `CurrentPort` | `PortId` | Porta di arrivo nel componente corrente |
 | `Progress` | `float` | Avanzamento: `0.0` ingresso → `1.0` uscita |
 | `DestinationComponent` | `ISimComponent?` | Destinazione finale |
-| `EntryTime` | `float` | Tempo simulato di ingresso nel sistema (init-only) |
+| `Status` | `EntityStatus` | Stato macchina corrente |
 
-Nessuna implementazione concreta — issue #6.
+`Reset()` è `internal` — usato da `EntityManager` per restituire l'istanza al pool.
+
+### EntityStatus
+
+**File:** `Entity/EntityStatus.cs`
+
+```csharp
+public enum EntityStatus { Idle, Moving, Queued }
+```
+
+### EntityState
+
+**File:** `Entity/EntityState.cs`
+
+Snapshot serializzabile per sincronizzazione di rete. Contiene solo tipi primitivi, nessun riferimento a oggetti C#.
+
+| Membro | Tipo | Descrizione |
+|---|---|---|
+| `Id` | `int` | Identificatore univoco |
+| `Sku` | `string` | Codice articolo |
+| `CurrentComponentId` | `int` | ID del componente corrente |
+| `CurrentPort` | `PortId` | Porta nel componente corrente |
+| `Progress` | `float` | Avanzamento sul componente |
+| `Status` | `EntityStatus` | Stato macchina |
+
+Factory method: `EntityState.From(SimEntity e)`.
+
+### EntityManager
+
+**File:** `Entity/EntityManager.cs`
+
+Gestisce il ciclo di vita delle entità. Implementa un object pool con `Queue<SimEntity>` per evitare allocazioni nel hot path.
+
+| Metodo | Descrizione |
+|---|---|
+| `Spawn(sku, weight, size, entryTime, startComponent, startPort)` | Prende dal pool (o crea) e inizializza una nuova entità attiva |
+| `Despawn(id)` | Rimuove dall'attivo, esegue `Reset()` e restituisce al pool |
+| `GetAll()` | Restituisce tutte le entità attive (`IReadOnlyCollection<SimEntity>`) |
+| `GetByComponent(componentId)` | Filtra le entità attive per componente corrente |
+
+`EntityManager` vive su `SimulationState.Entities`.
 
 ---
 
@@ -297,8 +365,8 @@ Nessuna implementazione concreta — issue #6.
 
 | Metodo | Quando viene chiamato |
 |---|---|
-| `OnEntityEnter(entity)` | `TryAccept` con successo |
-| `OnEntityExit(entity)` | Trasferimento al componente successivo |
+| `OnEntityEnter(SimEntity entity)` | `TryAccept` con successo |
+| `OnEntityExit(SimEntity entity)` | Trasferimento al componente successivo |
 | `OnTick(deltaTime)` | Ogni tick (*non ancora invocato — da implementare*) |
 
 ---
@@ -307,17 +375,18 @@ Nessuna implementazione concreta — issue #6.
 
 | Componente | Stato |
 |---|---|
-| `SimulationEngine` + tick loop | Implementato |
-| `GridManager` + `Cell` + `GridCoord` | Implementato |
-| `ISimComponent` + `OneWayConveyor` | Implementato |
-| `RoutingGraph` + `Connection` | Implementato |
-| `ICommand` + `CommandResult` | Implementati |
-| `StateDelta` (struttura base) | Implementata |
-| `IComponentModule` (interfaccia) | Implementata; `OnTick` non ancora invocato |
-| `ISimEntity` (interfaccia) | Definita; nessuna classe concreta — issue #6 |
-| `EntityManager` | Mancante — issue #6 |
-| Entità in `SimulationState` | Mancante — issue #6 |
-| `SimulationClock` | Mancante — issue #5 |
-| Delta completo (entità + componenti) | Parziale — issue #8 |
+| `SimulationEngine` + tick loop | ✅ Implementato |
+| `SimulationClock` (`SimulatedTime`, `TimeScale`, `IsLiveMode`, `Advance`) | ✅ Implementato (#5) |
+| `GridManager` + `Cell` + `GridCoord` | ✅ Implementato |
+| `ISimComponent` + `OneWayConveyor` | ✅ Implementato |
+| `RoutingGraph` + `Connection` | ✅ Implementato |
+| `ICommand` + `CommandResult` | ✅ Implementati |
+| `StateDelta` (componenti + entità) | ✅ Implementata (#6) |
+| `IComponentModule` (interfaccia) | ✅ Implementata; `OnTick` non ancora invocato |
+| `SimEntity` + `EntityStatus` | ✅ Implementati (#6) |
+| `EntityState` (snapshot rete) | ✅ Implementato (#6) |
+| `EntityManager` (CRUD + object pool) | ✅ Implementato (#6) |
+| Entità in `SimulationState` | ✅ Implementato (#6) |
+| Delta completo (posizioni aggiornate tick-by-tick) | Parziale — issue #8 |
 | Comandi concreti | Mancanti — issue #33 |
 | Logica routing con `DestinationComponent` | Mancante — issue #28 |
