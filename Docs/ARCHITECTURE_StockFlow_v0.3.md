@@ -90,17 +90,18 @@ StockFlow/
 │   │   ├── StockFlow.Simulation.csproj
 │   │   ├── Core/
 │   │   │   ├── SimulationEngine.cs      ← Entry point, tick loop
-│   │   │   ├── SimulationState.cs       ← Snapshot immutabile
+│   │   │   ├── SimulationState.cs       ← Snapshot osservabile corrente
 │   │   │   ├── StateDelta.cs            ← Delta tra due tick (per rete)
-│   │   │   └── SimulationClock.cs       ← Tempo simulato, velocità
+│   │   │   └── SimulationClock.cs       ← Tempo simulato, velocità, IsLiveMode ✅ #5
 │   │   ├── Grid/
 │   │   │   ├── GridManager.cs
 │   │   │   ├── Cell.cs
 │   │   │   └── GridCoord.cs
-│   │   ├── Entities/
-│   │   │   ├── Entity.cs
-│   │   │   ├── EntityManager.cs
-│   │   │   └── EntityState.cs
+│   │   ├── Entity/                      ← ✅ #6 (cartella Entity/, non Entities/)
+│   │   │   ├── Entity.cs                ← classe SimEntity — unità di carico
+│   │   │   ├── EntityStatus.cs          ← Idle / Moving / Queued
+│   │   │   ├── EntityManager.cs         ← CRUD + object pool + query per componente
+│   │   │   └── EntityState.cs           ← snapshot serializzabile per rete
 │   │   ├── Components/
 │   │   │   ├── ISimComponent.cs
 │   │   │   ├── ConveyorLogic.cs
