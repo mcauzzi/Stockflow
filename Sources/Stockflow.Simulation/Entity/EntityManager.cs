@@ -8,6 +8,8 @@ public class EntityManager
     private readonly Queue<SimEntity>           _pool   = new();
     private          int                        _nextId = 1;
 
+    public IReadOnlyDictionary<int, SimEntity> Active => _active;
+
     public IReadOnlyCollection<SimEntity> GetAll() => _active.Values;
 
     public IEnumerable<SimEntity> GetByComponent(int componentId)
