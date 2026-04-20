@@ -129,7 +129,12 @@ All clients include a client-generated `CommandId`; the server echoes it back in
 
 - `Vector3` — world-space position (server converts from its graph-based representation
   before broadcasting).
-- `ComponentType`, `Direction`, `EntityStatus`, `SimSpeed` — wire-stable `byte` enums.
+- `Direction`, `EntityStatus`, `SimSpeed` — wire-stable `byte` enums (closed sets that
+  won't grow with plugins).
+- `ComponentKinds` — static string constants for built-in component kinds. Components
+  travel on the wire as `string Kind` rather than an enum so plugins can register new
+  kinds without recompiling `Stockflow.Protocol`; once a kind string ships it becomes
+  part of the wire contract and must not be renamed.
 - `EntityState`, `ComponentState`, `SimEvent`, `MetricsSnapshot` — DTOs embedded in
   `StateDeltaMessage` / `FullStateMessage`.
 
@@ -206,7 +211,11 @@ Deltas typically compress another 2–3× on top of MessagePack's binary layout.
    with it.
 4. **Enum values are bytes with stable ordering.** Never reorder, never reuse a removed
    value. Add new enum members at the end.
-5. **Adding a new message type:** allocate the next unused `Union` tag on the relevant
+5. **Component kinds (strings) are wire contracts too.** Once `"conveyor_oneway"` ships,
+   it is immutable. Pick the string carefully the first time; add new kinds with new
+   strings; never silently alias or rename. Plugins are expected to namespace their kinds
+   (e.g. `"acme.custom_sorter"`) to avoid collisions with core.
+6. **Adding a new message type:** allocate the next unused `Union` tag on the relevant
    base class, add the `[MessagePackObject]` subclass, done. Old peers that don't know
    the tag will throw on deserialize — that's the designed behaviour.
 

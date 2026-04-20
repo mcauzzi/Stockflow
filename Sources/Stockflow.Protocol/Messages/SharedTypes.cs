@@ -20,13 +20,15 @@ public readonly struct Vector3
 }
 
 /// <summary>
-/// Component kind. Kept as a Protocol-local enum (not a reference to the Simulation one)
-/// so Unity clients can import only Stockflow.Protocol.dll.
-/// Keep numeric values stable across releases — they are part of the wire format.
+/// Component kind identifier used on the wire. A plain string (not an enum) because the
+/// set of component types is open: the plugin system registers new kinds at runtime, and
+/// scenario JSON already uses kind strings ("conveyor_oneway", "stacker_crane", ...).
+/// Once a kind ships in a release its string value is part of the wire contract — do not
+/// rename.
 /// </summary>
-public enum ComponentType : byte
+public static class ComponentKinds
 {
-    OneWayConveyor = 0,
+    public const string OneWayConveyor = "conveyor_oneway";
 }
 
 /// <summary>
@@ -84,11 +86,11 @@ public sealed record EntityState
 [MessagePackObject]
 public sealed record ComponentState
 {
-    [Key(0)] public int           Id     { get; init; }
-    [Key(1)] public ComponentType Type   { get; init; }
-    [Key(2)] public int           GridX  { get; init; }
-    [Key(3)] public int           GridY  { get; init; }
-    [Key(4)] public Direction     Facing { get; init; }
+    [Key(0)] public int       Id     { get; init; }
+    [Key(1)] public string    Kind   { get; init; } = "";
+    [Key(2)] public int       GridX  { get; init; }
+    [Key(3)] public int       GridY  { get; init; }
+    [Key(4)] public Direction Facing { get; init; }
 }
 
 /// <summary>

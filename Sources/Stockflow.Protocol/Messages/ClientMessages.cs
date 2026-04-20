@@ -28,10 +28,10 @@ public abstract class ClientMessage
 [MessagePackObject]
 public sealed class PlaceComponentMessage : ClientMessage
 {
-    [Key(1)] public ComponentType ComponentType { get; init; }
-    [Key(2)] public int           GridX         { get; init; }
-    [Key(3)] public int           GridY         { get; init; }
-    [Key(4)] public Direction     Direction     { get; init; }
+    [Key(1)] public string    Kind      { get; init; } = "";
+    [Key(2)] public int       GridX     { get; init; }
+    [Key(3)] public int       GridY     { get; init; }
+    [Key(4)] public Direction Direction { get; init; }
 }
 
 /// <summary>
