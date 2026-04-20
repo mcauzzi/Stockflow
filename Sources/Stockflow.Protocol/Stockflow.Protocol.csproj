@@ -1,9 +1,16 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <!-- MsgPack017: init-only properties with initializers reset to default on deserialization.
+             Safe here because both peers always emit every key on the wire. -->
+        <NoWarn>$(NoWarn);MsgPack017</NoWarn>
     </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="MessagePack" Version="3.1.4" />
+    </ItemGroup>
 
 </Project>
