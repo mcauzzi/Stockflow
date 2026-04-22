@@ -4,6 +4,8 @@
 **Data:** Aprile 2026
 **Documento collegato:** GDD Stock Flow v0.2
 
+> **Nota implementativa (Aprile 2026):** questo documento descrive l'architettura target. La struttura effettiva dei progetti nel repository differisce in alcuni nomi: `Stockflow.Webserver` anziché `StockFlow.Server`, namespace `Stockflow.*` (minuscola), .NET 10.0 anziché .NET 8+. Le sezioni §3 mostrano la struttura pianificata; fare riferimento a `CLAUDE.md` e `SIMULATION_ENGINE_v0.1.md` per lo stato implementativo corrente.
+
 ---
 
 ## 1. Principio Fondamentale
@@ -16,7 +18,7 @@ Non esiste stato autoritativo nei client. Non esiste logica di business in Unity
 
 ## 2. Architettura ad Alto Livello
 
-Il Simulation Engine vive in un **processo server standalone** scritto in .NET 8+ puro, completamente svincolato da Unity. I client (Unity, web, CLI) si connettono al server via rete.
+Il Simulation Engine vive in un **processo server standalone** scritto in .NET 10 puro, completamente svincolato da Unity. I client (Unity, web, CLI) si connettono al server via rete.
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -63,7 +65,7 @@ Il Simulation Engine vive in un **processo server standalone** scritto in .NET 8
 
 ### 2.1 — Perché un server separato
 
-**Libertà .NET completa:** Unity è limitato a un sottoinsieme di .NET (storicamente .NET Standard 2.1, ora .NET 6 parziale). Il server standalone usa .NET 8/9 con tutte le API moderne: System.Threading.Channels, Span<T> ad alte performance, source generators, ASP.NET hosting nativo per REST, Kestrel per WebSocket.
+**Libertà .NET completa:** Unity è limitato a un sottoinsieme di .NET (storicamente .NET Standard 2.1, ora .NET 6 parziale). Il server standalone usa .NET 10 con tutte le API moderne: System.Threading.Channels, Span<T> ad alte performance, source generators, ASP.NET hosting nativo per REST, Kestrel per WebSocket.
 
 **Deployment flessibile:** il server può girare come processo locale (gioco Steam), come servizio in un server aziendale (B2B), come container Docker in cloud, o headless in CI per test automatici.
 
@@ -102,10 +104,16 @@ StockFlow/
 │   │   │   ├── EntityStatus.cs          ← Idle / Moving / Queued
 │   │   │   ├── EntityManager.cs         ← CRUD + object pool + query per componente
 │   │   │   └── EntityState.cs           ← snapshot serializzabile per rete
-│   │   ├── Components/
+│   │   ├── Component/               ← cartella effettiva nel repo
 │   │   │   ├── ISimComponent.cs
-│   │   │   ├── ConveyorLogic.cs
-│   │   │   ├── CurveConveyorLogic.cs
+│   │   │   ├── OneWayConveyor.cs    ← implementato F0
+│   │   │   ├── ConveyorTurn.cs      ← implementato F0 (#20) — svolta 90°
+│   │   │   ├── TurnSide.cs          ← Left / Right
+│   │   │   ├── ComponentType.cs
+│   │   │   ├── Direction.cs + DirectionExtensions.cs
+│   │   │   ├── Port.cs / PortId.cs / PortDirection.cs
+│   │   │   │
+│   │   │   │   [Pianificati — fasi successive]
 │   │   │   ├── MergeLogic.cs
 │   │   │   ├── DiverterLogic.cs
 │   │   │   ├── AccumulatorLogic.cs
@@ -249,20 +257,21 @@ StockFlow/
 ### 3.1 — Dipendenze tra progetti
 
 ```
-StockFlow.Protocol ◄──────── StockFlow.Server
+Stockflow.Protocol ◄──────── Stockflow.Webserver      (nome effettivo nel repo)
         ▲                          │
-        │                          ├──► StockFlow.Simulation
+        │                          ├──► Stockflow.Simulation
         │                          │
-        │                          └──► StockFlow.Persistence
+        │                          └──► Stockflow.Persistence
         │
         └──────────────────── Unity Client (come DLL)
                               Web Client (come npm package)
 
 
-StockFlow.Simulation ──── C# puro, zero dipendenze
-StockFlow.Persistence ─── EF Core, non referenzia Simulation
-StockFlow.Protocol ─────── MessagePack, tipi condivisi
-StockFlow.Server ────────── referenzia tutti e tre
+Stockflow.Simulation ──── C# puro, zero dipendenze NuGet
+Stockflow.Persistence ─── EF Core, non referenzia Simulation
+Stockflow.Protocol ─────── MessagePack, tipi condivisi
+Stockflow.Webserver ─────── referenzia Simulation + Protocol (+ Persistence pianificato)
+Stockflow.Tests.Simulation ─ xUnit, referenzia solo Simulation
 Client Unity ────────────── referenzia solo Protocol (DLL)
 ```
 
@@ -1466,21 +1475,23 @@ Ogni comando ricevuto dal client è validato dal server. Se il comando è invali
 
 ### 16.1 — Namespace
 
-- `StockFlow.Simulation.*` — Simulation Engine (C# puro)
-- `StockFlow.Server.*` — Server hosting, API, WebSocket
-- `StockFlow.Persistence.*` — EF Core, DbContext, repository
-- `StockFlow.Protocol.*` — Messaggi e tipi condivisi
-- `StockFlow.Game.*` — Client Unity
+- `Stockflow.Simulation.*` — Simulation Engine (C# puro)
+- `Stockflow.Webserver.*` — Server hosting, API, WebSocket
+- `Stockflow.Persistence.*` — EF Core, DbContext, repository
+- `Stockflow.Protocol.*` — Messaggi e tipi condivisi
+- `Stockflow.Tests.Simulation.*` — xUnit test del motore
+- `StockFlow.Game.*` — Client Unity (futuro)
 
 ### 16.2 — Regole ferree
 
-- `StockFlow.Simulation` non referenzia MAI Server, Persistence, Protocol, o UnityEngine
-- `StockFlow.Simulation` comunica con la persistenza SOLO tramite interfacce astratte (`IMetricsSink`)
-- `StockFlow.Persistence` non referenzia MAI Simulation — riceve solo DTO
+- `Stockflow.Simulation` non referenzia MAI Webserver, Persistence, Protocol, o UnityEngine
+- `Stockflow.Simulation` comunica con la persistenza SOLO tramite interfacce astratte (`IMetricsSink`)
+- `Stockflow.Persistence` non referenzia MAI Simulation — riceve solo DTO
 - Il client Unity referenzia SOLO Protocol (come DLL importata)
 - Il client non modifica MAI il suo stato locale se non in risposta a un messaggio del server
 - Il database non viene MAI toccato nel hot path (tick loop)
 - Le write su DB sono SEMPRE asincrone via MetricsFlushService
+- `SimulationClock.Advance` riceve un delta già scalato — NON applicare `TimeScale` una seconda volta
 
 ---
 

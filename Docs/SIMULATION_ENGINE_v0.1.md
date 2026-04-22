@@ -12,13 +12,16 @@ Stockflow.Simulation/
 │   ├── SimulationEngine.cs
 │   ├── SimulationClock.cs
 │   ├── SimulationState.cs
-│   └── StateDelta.cs
+│   ├── StateDelta.cs
+│   └── SimulationEvent.cs
 ├── Commands/
 │   ├── ICommand.cs
 │   └── CommandResult.cs
 ├── Component/
 │   ├── ISimComponent.cs
 │   ├── OneWayConveyor.cs
+│   ├── ConveyorTurn.cs      ← #20
+│   ├── TurnSide.cs          ← #20
 │   ├── ComponentType.cs
 │   ├── Direction.cs
 │   ├── DirectionExtensions.cs
@@ -26,12 +29,12 @@ Stockflow.Simulation/
 │   ├── PortId.cs
 │   └── PortDirection.cs
 ├── Entity/
-│   ├── SimEntity.cs      (in Entity.cs)
+│   ├── Entity.cs            (classe SimEntity)
 │   ├── EntityStatus.cs
 │   ├── EntityState.cs
 │   └── EntityManager.cs
 ├── Grid/
-│   ├── Cell.cs          (contiene anche GridManager)
+│   ├── Cell.cs              (contiene anche GridManager)
 │   └── GridCoord.cs
 ├── Modules/
 │   └── IComponentModule.cs
@@ -77,11 +80,11 @@ public class SimulationEngine(int width, int length, int height)
 engine.Tick(1f / tickRate * engine.TimeScale);
 ```
 
-L'engine non conosce il tick rate reale; lo riceve già calcolato. Questo permette al server di variare frequenza e velocità indipendentemente.
+L'engine non conosce il tick rate reale; lo riceve già calcolato e scalato. `SimulationClock.Advance` somma il delta direttamente senza applicare nuovamente `TimeScale`.
 
 **GetStateDelta — semantica:**
 
-Traccia internamente gli insiemi di ID componenti e ID entità noti. Ad ogni chiamata restituisce aggiunte e rimozioni rispetto alla chiamata precedente. Verrà espanso con delta completo (issue #8).
+Traccia internamente gli insiemi di ID componenti e ID entità noti. Ad ogni chiamata restituisce aggiunte, aggiornamenti e rimozioni rispetto alla chiamata precedente.
 
 ### SimulationClock
 
@@ -94,7 +97,9 @@ Gestisce il tempo simulato in modo indipendente dall'engine.
 | `SimulatedTime` | `float` | Tempo simulato accumulato in secondi |
 | `TimeScale` | `float` | Moltiplicatore velocità: 1x, 2x, 5x, 10x |
 | `IsLiveMode` | `bool` | `true` quando `TimeScale == 1f`; Phase 2: bloccato con connessioni WMS attive |
-| `Advance(realDelta)` | `void` | `SimulatedTime += realDelta * TimeScale` |
+| `Advance(delta)` | `void` | `SimulatedTime += delta` — il caller fornisce già il delta scalato |
+
+**Importante:** `Advance` non moltiplica per `TimeScale`. Il chiamante è responsabile di applicare la scala prima di invocare `Tick`.
 
 ### SimulationState
 
@@ -118,8 +123,31 @@ Differenze tra due tick consecutivi. Struttura in espansione progressiva.
 | `SimulationTime` | `float` | Tempo simulato al momento del delta |
 | `AddedComponentIds` | `IReadOnlyList<int>` | ID componenti aggiunti dall'ultimo delta |
 | `RemovedComponentIds` | `IReadOnlyList<int>` | ID componenti rimossi dall'ultimo delta |
-| `AddedEntityStates` | `IReadOnlyList<EntityState>` | Snapshot delle entità entrate nel sistema dall'ultimo delta |
-| `RemovedEntityIds` | `IReadOnlyList<int>` | ID delle entità uscite dal sistema dall'ultimo delta |
+| `AddedEntityStates` | `IReadOnlyList<EntityState>` | Snapshot delle entità entrate nel sistema |
+| `UpdatedEntityStates` | `IReadOnlyList<EntityState>` | Snapshot delle entità aggiornate (Progress, Status, ecc.) |
+| `RemovedEntityIds` | `IReadOnlyList<int>` | ID delle entità uscite dal sistema |
+| `Events` | `IReadOnlyList<SimulationEvent>` | Eventi discreti generati durante il tick |
+
+### SimulationEvent
+
+**File:** `Core/SimulationEvent.cs` — namespace `Stockflow.Simulation.Core`
+
+Evento discreto generato durante un tick, incluso nel delta per animazioni lato client e audit.
+
+```csharp
+public enum SimulationEventType
+{
+    EntityTransferred,  // entità passata da un componente al successivo
+    ConveyorJammed,     // entità non ha potuto uscire per capacità piena
+}
+
+public sealed class SimulationEvent
+{
+    public SimulationEventType Type        { get; init; }
+    public int                 EntityId    { get; init; }
+    public int?                ComponentId { get; init; }
+}
+```
 
 ---
 
@@ -196,7 +224,7 @@ Tutti i metodi usano il pattern `Try*` — non throwing.
 |---|---|---|
 | `Id` | `int` | Identificatore univoco |
 | `Position` | `GridCoord` | Cella occupata nella griglia |
-| `Facing` | `Direction` | Orientamento del componente |
+| `Facing` | `Direction` | Direzione di ingresso flusso entità |
 | `Type` | `ComponentType` | Costante sulla classe concreta |
 | `Modules` | `IReadOnlyList<IComponentModule>` | Moduli comportamentali aggiuntivi |
 | `Occupant` | `SimEntity?` | Entità attualmente sul componente |
@@ -217,7 +245,7 @@ public enum Direction { North, East, South, West }
 | `ToOffset()` | `GridCoord` offset unitario nella direzione |
 | `Opposite()` | Direzione opposta |
 | `RotateCW()` | Rotazione 90° orario |
-| `RotateCCW()` | Rotazione 90° antiorario |
+| `RotateCCW()` | Rotazione 90° antiorario (`RotateCW().Opposite()`) |
 
 ### Port
 
@@ -229,21 +257,25 @@ public readonly record struct Port(PortId Id, GridCoord Position, PortDirection 
 
 `Position` è la cella su cui si affaccia la porta (adiacente al componente). `Direction`: `In`, `Out`, `Bidirectional`.
 
+**Convenzione porte per tutti i conveyor:**
+- `PortId(0)` — InPort (entrata)
+- `PortId(1)` — OutPort (uscita)
+
 ### ComponentType
 
 **File:** `Component/ComponentType.cs`
 
 ```csharp
-public enum ComponentType { OneWayConveyor }
+public enum ComponentType { OneWayConveyor, ConveyorTurn }
 ```
 
-Ogni classe concreta restituisce il proprio tipo come proprietà costante (`Type => ComponentType.OneWayConveyor`), non configurabile via costruttore.
+Ogni classe concreta restituisce il proprio tipo come proprietà costante (`Type => ComponentType.X`), non configurabile via costruttore.
 
 ### OneWayConveyor
 
 **File:** `Component/OneWayConveyor.cs`
 
-Nastro trasportatore unidirezionale. Trasporta un'entità dall'ingresso all'uscita.
+Nastro trasportatore unidirezionale. Trasporta un'entità dall'ingresso all'uscita in linea retta.
 
 ```csharp
 public OneWayConveyor(int id, GridCoord position, Direction facing, float speed,
@@ -251,8 +283,8 @@ public OneWayConveyor(int id, GridCoord position, Direction facing, float speed,
 ```
 
 **Porte generate automaticamente:**
-- `InPort` (Id=0): cella opposta a `Facing`
-- `OutPort` (Id=1): cella nella direzione di `Facing`
+- `InPort` (Id=0): cella in direzione `Facing.Opposite()`
+- `OutPort` (Id=1): cella in direzione `Facing`
 
 **Logica di tick:**
 1. Nessun occupante → nessuna operazione.
@@ -260,6 +292,42 @@ public OneWayConveyor(int id, GridCoord position, Direction facing, float speed,
 3. `Progress >= 1.0` → tenta trasferimento via `RoutingGraph`. Se ha successo: notifica `OnEntityExit` ai moduli, libera il componente.
 
 `Speed` è in "unità di progresso per secondo simulato".
+
+### ConveyorTurn
+
+**File:** `Component/ConveyorTurn.cs` — aggiunto in #20
+
+Nastro trasportatore con svolta a 90°. Reindirizza il flusso entità da una direzione a quella perpendicolare, consentendo la costruzione di circuiti chiusi.
+
+```csharp
+public ConveyorTurn(int id, GridCoord position, Direction facing, TurnSide turn, float speed,
+                    RoutingGraph graph, IReadOnlyList<IComponentModule>? modules = null)
+```
+
+**Porte generate automaticamente:**
+- `InPort` (Id=0): cella in direzione `Facing.Opposite()` (stesso schema di `OneWayConveyor`)
+- `OutPort` (Id=1): cella in direzione `Facing.RotateCW()` se `turn == Right`, `Facing.RotateCCW()` se `turn == Left`
+
+**Logica di tick:** identica a `OneWayConveyor`.
+
+**Esempio — loop orario a 4 svolte:**
+
+```
+CT1(0,1) facing North TurnRight  →  OutPort a East (1,1)
+CT2(1,1) facing East  TurnRight  →  OutPort a South (1,0)
+CT3(1,0) facing South TurnRight  →  OutPort a West (0,0)
+CT4(0,0) facing West  TurnRight  →  OutPort a North (0,1)
+```
+
+Con `Speed=1` e `deltaTime=1`, un giro completo richiede 5 iterazioni (il componente che riceve viene toccato nello stesso round in cui avviene il trasferimento).
+
+### TurnSide
+
+**File:** `Component/TurnSide.cs` — aggiunto in #20
+
+```csharp
+public enum TurnSide { Left, Right }
+```
 
 ---
 
@@ -371,6 +439,22 @@ Gestisce il ciclo di vita delle entità. Implementa un object pool con `Queue<Si
 
 ---
 
+## Test
+
+**Progetto:** `Sources/Stockflow.Tests.Simulation/` — xUnit, referenzia `Stockflow.Simulation`
+
+| Classe di test | Cosa copre |
+|---|---|
+| `GridManagerTests` | TryPlace, TryRemove, celle occupate, fuori bounds, adiacenza cardinale |
+| `OneWayConveyorTests` | TryAccept, avanzamento Progress, trasferimento al next, comportamento senza next |
+| `EntityManagerTests` | Spawn, Despawn, pool reuse, GetByComponent, GetAll |
+| `SimulationEngineTests` | Tick time, componenti eseguiti, StateDelta add/remove componenti ed entità |
+| `ConveyorTurnTests` | Orientamento OutPort via `[Theory]`, loop circolare a 4 svolte (due giri) |
+
+Helper condiviso: `Helpers/StubComponent` — implementazione minimale di `ISimComponent` per test che non richiedono logica conveyor reale.
+
+---
+
 ## Stato attuale e gap noti
 
 | Componente | Stato |
@@ -379,14 +463,18 @@ Gestisce il ciclo di vita delle entità. Implementa un object pool con `Queue<Si
 | `SimulationClock` (`SimulatedTime`, `TimeScale`, `IsLiveMode`, `Advance`) | ✅ Implementato (#5) |
 | `GridManager` + `Cell` + `GridCoord` | ✅ Implementato |
 | `ISimComponent` + `OneWayConveyor` | ✅ Implementato |
+| `ConveyorTurn` + `TurnSide` | ✅ Implementato (#20) |
 | `RoutingGraph` + `Connection` | ✅ Implementato |
 | `ICommand` + `CommandResult` | ✅ Implementati |
-| `StateDelta` (componenti + entità) | ✅ Implementata (#6) |
+| `StateDelta` (componenti + entità + eventi) | ✅ Implementata (#6) |
+| `SimulationEvent` (`EntityTransferred`, `ConveyorJammed`) | ✅ Dichiarata; non ancora emessa nel tick |
 | `IComponentModule` (interfaccia) | ✅ Implementata; `OnTick` non ancora invocato |
 | `SimEntity` + `EntityStatus` | ✅ Implementati (#6) |
 | `EntityState` (snapshot rete) | ✅ Implementato (#6) |
 | `EntityManager` (CRUD + object pool) | ✅ Implementato (#6) |
 | Entità in `SimulationState` | ✅ Implementato (#6) |
+| Unit test `Stockflow.Tests.Simulation` | ✅ Implementati (#20) — 38 test, tutti passanti |
 | Delta completo (posizioni aggiornate tick-by-tick) | Parziale — issue #8 |
+| Emissione `SimulationEvent` durante il tick | Mancante — da collegare a #8 |
 | Comandi concreti | Mancanti — issue #33 |
 | Logica routing con `DestinationComponent` | Mancante — issue #28 |

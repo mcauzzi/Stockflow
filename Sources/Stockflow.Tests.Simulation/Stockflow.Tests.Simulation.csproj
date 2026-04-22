@@ -18,4 +18,8 @@
         <Using Include="Xunit"/>
     </ItemGroup>
 
+    <ItemGroup>
+        <ProjectReference Include="..\Stockflow.Simulation\Stockflow.Simulation.csproj"/>
+    </ItemGroup>
+
 </Project>
