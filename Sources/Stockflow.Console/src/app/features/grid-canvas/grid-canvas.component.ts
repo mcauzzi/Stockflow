@@ -68,7 +68,7 @@ const FLOORS = [
       <!-- Main SVG -->
       <svg #svgEl
            [attr.viewBox]="viewBox"
-           preserveAspectRatio="xMinYMin slice"
+           preserveAspectRatio="none"
            style="flex:1;width:100%;cursor:crosshair;display:block"
            (mousemove)="onMouseMove($event)"
            (mouseleave)="hover = null"
@@ -254,11 +254,14 @@ export class GridCanvasComponent implements OnChanges {
   onMouseMove(e: MouseEvent): void {
     const svg = this.svgEl?.nativeElement;
     if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    const vx = (e.clientX - rect.left) * (this.svgW / rect.width);
-    const vy = (e.clientY - rect.top)  * (this.svgH / rect.height);
-    const cx = Math.floor(vx / CELL);
-    const cy = Math.floor(vy / CELL);
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const { x, y } = pt.matrixTransform(ctm.inverse());
+    const cx = Math.floor(x / CELL);
+    const cy = Math.floor(y / CELL);
     this.hover = (cx >= 0 && cx < this.cols && cy >= 0 && cy < this.rows)
       ? { x: cx, y: cy } : null;
   }
