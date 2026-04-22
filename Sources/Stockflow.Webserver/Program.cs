@@ -38,7 +38,16 @@ builder.Services.AddSingleton<SimulationEngine>(sp =>
 });
 builder.Services.AddHostedService<SimulationHostedService>();
 
+builder.Services.AddControllers();
+
+// Local mode: allow any origin so the Angular dev server (default :4200) can reach the REST API.
+// Enterprise mode would restrict this to known origins via config.
+builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
+    p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
+
 var app = builder.Build();
+
+app.UseCors();
 
 app.UseWebSockets(new WebSocketOptions
 {
@@ -55,5 +64,7 @@ app.MapGet("/api/health", (WebSocketHandler handler) => Results.Ok(new
     status            = "ok",
     connectedClients  = handler.ConnectedClientCount,
 }));
+
+app.MapControllers();
 
 app.Run();

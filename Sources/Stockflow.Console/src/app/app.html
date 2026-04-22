@@ -1,0 +1,59 @@
+<app-topbar
+  [activeTab]="activeTab()"
+  [connected]="sim.connected()"
+  [restOnline]="sim.restOnline()"
+  (tabChange)="onTabChange($event)">
+</app-topbar>
+
+<app-kpi-strip
+  [simClock]="sim.simClock()"
+  [timeScale]="sim.timeScale()"
+  [metrics]="sim.metrics()"
+  [entityCount]="sim.entities().size"
+  [componentCount]="sim.components().size"
+  [sparks]="sparks()"
+  [currentSpeedId]="currentSpeed()"
+  [paused]="paused()"
+  (speedChange)="onSpeedChange($event)"
+  (pauseToggle)="onPauseToggle()">
+</app-kpi-strip>
+
+<!-- OPERATE / LAYOUT: palette + grid + inspector -->
+<div class="main" *ngIf="showMainGrid">
+  <app-palette
+    [selectedId]="selectedTool()?.id ?? null"
+    (itemSelect)="onToolSelect($event)">
+  </app-palette>
+
+  <app-grid-canvas
+    [components]="sim.components()"
+    [entities]="sim.entities()"
+    [selectedId]="selectedComp()?.id ?? null"
+    [cols]="sim.gridWidth()"
+    [rows]="sim.gridLength()"
+    (componentSelect)="onComponentSelect($event)">
+  </app-grid-canvas>
+
+  <app-inspector [selected]="selectedComp()"></app-inspector>
+</div>
+
+<!-- ORDERS -->
+<app-orders-view *ngIf="activeTab() === 'ORDERS'"></app-orders-view>
+
+<!-- METRICS -->
+<app-metrics-view
+  *ngIf="activeTab() === 'METRICS'"
+  [metrics]="sim.metrics()"
+  [sparks]="sparks()"
+  [entityCount]="sim.entities().size"
+  [componentCount]="sim.components().size">
+</app-metrics-view>
+
+<!-- WORKSHOP / PRO stubs -->
+<app-stub-view *ngIf="activeTab() === 'WORKSHOP'" tab="WORKSHOP"></app-stub-view>
+<app-stub-view *ngIf="activeTab() === 'PRO'"      tab="PRO"></app-stub-view>
+
+<!-- Bottom event log (OPERATE only) -->
+<div class="bottom" *ngIf="showBottom">
+  <app-event-log [events]="sim.events()"></app-event-log>
+</div>
