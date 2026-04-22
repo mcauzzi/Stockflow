@@ -1,6 +1,6 @@
 import {
   Component, Input, Output, EventEmitter,
-  ElementRef, ViewChild, AfterViewInit, OnChanges,
+  ElementRef, ViewChild, OnChanges,
 } from '@angular/core';
 import { NgFor, NgIf, NgSwitch, NgSwitchCase, NgSwitchDefault } from '@angular/common';
 import { ComponentState, EntityState, Direction } from '../../core/models/protocol';
@@ -21,49 +21,43 @@ const FLOORS = [
   standalone: true,
   imports: [NgFor, NgIf, NgSwitch, NgSwitchCase, NgSwitchDefault],
   template: `
-    <div class="canvas-wrap">
+    <div class="wrap">
 
-      <!-- Floor selector -->
-      <div class="canvas-overlay tl">
-        <div>WAREHOUSE · SANDBOX-01 · {{ cols }}×{{ rows }} CELLS</div>
-        <div class="dim2">CELL 1.00 × 1.00 m</div>
-        <div style="margin-top:8px;display:flex;gap:0;border:1px solid var(--border-bright);background:var(--bg-1);">
+      <!-- Floor / info overlay (top-left) -->
+      <div class="ovl tl">
+        <div class="ovl-info">WAREHOUSE · SANDBOX-01 · {{ cols }}×{{ rows }}</div>
+        <div class="floor-btns">
           <button *ngFor="let f of floors"
-                  (click)="floor = f.id"
-                  [style.background]="floor === f.id ? 'var(--amber)' : 'var(--bg-1)'"
-                  [style.color]="floor === f.id ? 'var(--bg-0)' : 'var(--text-2)'"
-                  style="padding:6px 10px;border:none;border-right:1px solid var(--border);
-                         font-family:var(--mono);font-size:10px;letter-spacing:.08em;
-                         display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:78px;cursor:pointer">
-            <span style="font-weight:700">{{ f.label }} · {{ f.name }}</span>
-            <span style="font-size:9px;opacity:.75">{{ f.h.toFixed(1) }}m · L{{ f.id }}</span>
+                  class="fbtn" [class.on]="floor === f.id"
+                  (click)="floor = f.id">
+            {{ f.label }} · {{ f.name }}
           </button>
         </div>
       </div>
 
-      <!-- Top-right cursor info -->
-      <div class="canvas-overlay tr">
-        <div>FLOOR <span class="amber">L{{ floor }}</span>
-          · CURSOR {{ hover ? '(' + pad(hover.x) + ',' + pad(hover.y) + ')' : '(--,--)' }}</div>
-        <div class="dim2">{{ componentCount }} components · {{ entityCount }} entities</div>
+      <!-- Cursor info (top-right) -->
+      <div class="ovl tr">
+        <div class="ovl-info">
+          FLOOR <span class="amber">L{{ floor }}</span>
+          &nbsp;CURSOR {{ hover ? pad(hover.x)+','+pad(hover.y) : '--,--' }}
+        </div>
+        <div class="ovl-info dim2">{{ componentCount }} components · {{ entityCount }} entities</div>
       </div>
 
-      <!-- Overlay toggles -->
-      <div class="canvas-overlay bl">
-        <div class="overlay-toggle" style="background:var(--bg-2);cursor:default;color:var(--text-2)">OVERLAYS</div>
-        <div class="overlay-toggle" [class.active]="showEntities" (click)="showEntities = !showEntities">
-          <span class="bullet"></span>Flow entities
-        </div>
-        <div class="overlay-toggle" [class.active]="showHeat" (click)="showHeat = !showHeat">
-          <span class="bullet"></span>Util heatmap
-        </div>
+      <!-- Overlay toggles (bottom-left) -->
+      <div class="ovl bl">
+        <button class="tog" [class.on]="showEntities" (click)="showEntities = !showEntities">
+          <span class="bul" [class.lit]="showEntities"></span>Flow entities
+        </button>
+        <button class="tog" [class.on]="showHeat" (click)="showHeat = !showHeat">
+          <span class="bul" [class.lit]="showHeat"></span>Util heatmap
+        </button>
       </div>
 
-      <!-- Minimap -->
-      <div class="canvas-overlay br">
-        <div style="font-family:var(--mono);font-size:10px;color:var(--text-3);letter-spacing:.08em;
-                    text-transform:uppercase;margin-bottom:4px">MINIMAP</div>
-        <svg [attr.viewBox]="'0 0 ' + cols + ' ' + rows" width="180" height="90">
+      <!-- Minimap (bottom-right) -->
+      <div class="ovl br">
+        <div class="ovl-info">MINIMAP</div>
+        <svg [attr.viewBox]="'0 0 ' + cols + ' ' + rows" width="160" height="80" style="display:block">
           <rect [attr.width]="cols" [attr.height]="rows" fill="#0a0c0e"/>
           <rect *ngFor="let c of visibleComponents"
                 [attr.x]="c.gridX" [attr.y]="c.gridY" width="1" height="1"
@@ -71,69 +65,67 @@ const FLOORS = [
         </svg>
       </div>
 
-      <!-- Main SVG grid -->
+      <!-- Main SVG -->
       <svg #svgEl
            [attr.viewBox]="viewBox"
-           preserveAspectRatio="xMidYMid meet"
-           style="width:100%;height:100%;display:block;cursor:crosshair"
+           preserveAspectRatio="xMinYMin slice"
+           style="flex:1;width:100%;cursor:crosshair;display:block"
            (mousemove)="onMouseMove($event)"
            (mouseleave)="hover = null"
            (click)="onGridClick()">
 
-        <!-- Background -->
         <defs>
-          <pattern id="gridDot" [attr.width]="CELL" [attr.height]="CELL" patternUnits="userSpaceOnUse">
-            <circle cx="0.5" cy="0.5" r="0.6" fill="#232932"/>
+          <pattern id="dot28" [attr.width]="CELL" [attr.height]="CELL" patternUnits="userSpaceOnUse">
+            <circle cx="0" cy="0" r="0.8" fill="#1e2832"/>
           </pattern>
-          <pattern id="gridMajor" [attr.width]="CELL*4" [attr.height]="CELL*4" patternUnits="userSpaceOnUse">
-            <path [attr.d]="'M ' + CELL*4 + ' 0 L 0 0 0 ' + CELL*4" fill="none" stroke="#1a1f26" stroke-width="0.5"/>
+          <pattern id="maj28" [attr.width]="CELL*5" [attr.height]="CELL*5" patternUnits="userSpaceOnUse">
+            <path [attr.d]="'M '+CELL*5+' 0 L 0 0 0 '+CELL*5" fill="none" stroke="#181d24" stroke-width="0.5"/>
           </pattern>
         </defs>
-        <rect [attr.width]="svgW" [attr.height]="svgH" fill="#0a0c0e"/>
-        <rect [attr.width]="svgW" [attr.height]="svgH" fill="url(#gridMajor)"/>
-        <rect [attr.width]="svgW" [attr.height]="svgH" fill="url(#gridDot)"/>
+
+        <rect [attr.width]="svgW" [attr.height]="svgH" fill="#0c0f12"/>
+        <rect [attr.width]="svgW" [attr.height]="svgH" fill="url(#maj28)"/>
+        <rect [attr.width]="svgW" [attr.height]="svgH" fill="url(#dot28)"/>
 
         <!-- Components -->
         <g *ngFor="let c of visibleComponents"
-           [attr.transform]="'translate(' + c.gridX*CELL + ',' + c.gridY*CELL + ')'"
+           [attr.transform]="'translate('+c.gridX*CELL+','+c.gridY*CELL+')'"
+           style="cursor:pointer"
            (click)="selectComponent(c); $event.stopPropagation()">
           <ng-container [ngSwitch]="c.kind">
 
-            <!-- ONE-WAY CONVEYOR -->
             <ng-container *ngSwitchCase="'conveyor_oneway'">
               <rect x="1" y="1" [attr.width]="CELL-2" [attr.height]="CELL-2"
-                    fill="#2c333d"
-                    [attr.stroke]="c.id === selectedId ? '#f5a623' : '#3d4652'"
+                    fill="#212830"
+                    [attr.stroke]="c.id === selectedId ? '#f5a623' : '#2e3848'"
                     [attr.stroke-width]="c.id === selectedId ? 1.5 : 1"/>
-              <g [attr.transform]="'rotate(' + facingRot(c.facing) + ' ' + CELL/2 + ' ' + CELL/2 + ')'">
-                <line x1="3" [attr.y1]="CELL/2" [attr.x2]="CELL-3" [attr.y2]="CELL/2" stroke="#5a6472" stroke-width="1"/>
-                <polygon [attr.points]="arrowPts()" fill="#9ba3af"/>
-                <line *ngFor="let x of [7,14,21]" [attr.x1]="x" [attr.y1]="CELL/2-4" [attr.x2]="x" [attr.y2]="CELL/2+4" stroke="#3d4652" stroke-width="0.5"/>
+              <g [attr.transform]="'rotate('+facingRot(c.facing)+' '+CELL/2+' '+CELL/2+')'">
+                <line x1="4" [attr.y1]="CELL/2" [attr.x2]="CELL-6" [attr.y2]="CELL/2" stroke="#4a5668" stroke-width="1.2"/>
+                <polygon [attr.points]="arrowPts()" fill="#8898aa"/>
+                <line *ngFor="let x of tickXs" [attr.x1]="x" [attr.y1]="CELL/2-3" [attr.x2]="x" [attr.y2]="CELL/2+3" stroke="#2e3848" stroke-width="0.8"/>
               </g>
             </ng-container>
 
-            <!-- CONVEYOR TURN -->
             <ng-container *ngSwitchCase="'conveyor_turn'">
               <rect x="1" y="1" [attr.width]="CELL-2" [attr.height]="CELL-2"
-                    fill="#2c333d"
-                    [attr.stroke]="c.id === selectedId ? '#f5a623' : '#3d4652'"
+                    fill="#1e2830"
+                    [attr.stroke]="c.id === selectedId ? '#f5a623' : '#2e3848'"
                     [attr.stroke-width]="c.id === selectedId ? 1.5 : 1"/>
-              <g [attr.transform]="'rotate(' + facingRot(c.facing) + ' ' + CELL/2 + ' ' + CELL/2 + ')'">
-                <path [attr.d]="'M ' + CELL/2 + ' ' + (CELL-3) + ' Q ' + CELL/2 + ' ' + CELL/2 + ' ' + (CELL-3) + ' ' + CELL/2"
-                      stroke="#5a6472" stroke-width="1" fill="none"/>
-                <polygon [attr.points]="arrowPts()" fill="#9ba3af"/>
+              <g [attr.transform]="'rotate('+facingRot(c.facing)+' '+CELL/2+' '+CELL/2+')'">
+                <path [attr.d]="'M '+CELL/2+' '+(CELL-4)+' Q '+CELL/2+' '+CELL/2+' '+(CELL-4)+' '+CELL/2"
+                      stroke="#4a5668" stroke-width="1.2" fill="none"/>
+                <polygon [attr.points]="arrowPtsTurn()" fill="#8898aa"/>
               </g>
             </ng-container>
 
-            <!-- GENERIC / UNKNOWN -->
             <ng-container *ngSwitchDefault>
               <rect x="1" y="1" [attr.width]="CELL-2" [attr.height]="CELL-2"
-                    fill="#1a1f26"
-                    [attr.stroke]="c.id === selectedId ? '#f5a623' : '#3d4652'"
+                    fill="#181d24"
+                    [attr.stroke]="c.id === selectedId ? '#f5a623' : '#2e3848'"
                     stroke-width="1"/>
               <text [attr.x]="CELL/2" [attr.y]="CELL/2+3"
-                    font-size="7" fill="#5a6472" font-family="JetBrains Mono" text-anchor="middle">
-                {{ c.kind.slice(0,3).toUpperCase() }}
+                    font-size="6" fill="#4a5668" font-family="JetBrains Mono,monospace" text-anchor="middle">
+                {{ c.kind.slice(0,4).toUpperCase() }}
               </text>
             </ng-container>
 
@@ -142,29 +134,87 @@ const FLOORS = [
 
         <!-- Entity pips -->
         <g *ngIf="showEntities">
-          <g *ngFor="let e of visibleEntities">
-            <rect [attr.x]="e.position.x * CELL - 3"
-                  [attr.y]="e.position.y * CELL - 3"
-                  width="6" height="6"
-                  [attr.fill]="e.status === 'Queued' ? '#ef4444' : '#f5a623'"
-                  stroke="#0a0c0e" stroke-width="0.5"/>
-          </g>
+          <rect *ngFor="let e of visibleEntities"
+                [attr.x]="e.position.x*CELL-3" [attr.y]="e.position.y*CELL-3"
+                width="6" height="6"
+                [attr.fill]="e.status === 'Queued' ? '#ef4444' : '#f5a623'"
+                stroke="#0c0f12" stroke-width="0.5"/>
         </g>
 
-        <!-- Hover cell -->
+        <!-- Hover highlight -->
         <rect *ngIf="hover"
-              [attr.x]="hover.x * CELL" [attr.y]="hover.y * CELL"
+              [attr.x]="hover.x*CELL" [attr.y]="hover.y*CELL"
               [attr.width]="CELL" [attr.height]="CELL"
-              class="cell-hover" pointer-events="none"/>
+              fill="rgba(245,166,35,.07)" stroke="#f5a623" stroke-width="0.5"
+              pointer-events="none"/>
 
-        <!-- Axis labels -->
-        <g font-family="JetBrains Mono" font-size="8" fill="#3d4652">
-          <text *ngFor="let i of colLabels" [attr.x]="i*4*CELL+2" y="10">{{ pad(i*4) }}</text>
-        </g>
+        <!-- Column labels -->
+        <text *ngFor="let i of colLabels"
+              [attr.x]="i*5*CELL+2" y="9"
+              font-size="7" fill="#2e3848" font-family="JetBrains Mono,monospace">{{ pad(i*5) }}</text>
 
       </svg>
     </div>
   `,
+  styles: [`
+    :host { display: contents; }
+    .wrap {
+      flex: 1;
+      background: #0c0f12;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+      min-width: 0;
+    }
+    .ovl {
+      position: absolute;
+      z-index: 10;
+      background: rgba(10,12,14,.88);
+      border: 1px solid #1e2832;
+      padding: 7px 10px;
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--text-3);
+    }
+    .tl { top: 8px; left: 8px; }
+    .tr { top: 8px; right: 8px; text-align: right; }
+    .bl { bottom: 8px; left: 8px; display: flex; flex-direction: column; gap: 3px; padding: 5px 8px; }
+    .br { bottom: 8px; right: 8px; padding: 6px 8px; }
+    .ovl-info { font-size: 9px; margin-bottom: 2px; white-space: nowrap; }
+    .floor-btns { display: flex; gap: 0; margin-top: 5px; }
+    .fbtn {
+      padding: 4px 10px;
+      border: 1px solid #1e2832;
+      border-right: none;
+      background: #0f1214;
+      color: var(--text-3);
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .05em;
+      cursor: pointer;
+      transition: all .12s;
+    }
+    .fbtn:last-child { border-right: 1px solid #1e2832; }
+    .fbtn.on { background: var(--amber); color: #0a0c0e; border-color: var(--amber); font-weight: 600; }
+    .tog {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 6px;
+      border: 1px solid #1e2832;
+      background: transparent;
+      color: var(--text-3);
+      font-family: var(--mono);
+      font-size: 8px;
+      letter-spacing: .05em;
+      cursor: pointer;
+      transition: all .1s;
+    }
+    .tog.on { color: var(--text-1); border-color: #2a3540; }
+    .bul { width: 6px; height: 6px; border-radius: 50%; background: #2e3848; flex-shrink: 0; }
+    .bul.lit { background: var(--green); }
+  `],
 })
 export class GridCanvasComponent implements OnChanges {
   @Input() components = new Map<number, ComponentState>();
@@ -178,6 +228,7 @@ export class GridCanvasComponent implements OnChanges {
 
   readonly CELL = CELL;
   readonly floors = FLOORS;
+  readonly tickXs = [7, 14, 21];
 
   floor: Floor = 0;
   hover: HoverCell | null = null;
@@ -191,13 +242,13 @@ export class GridCanvasComponent implements OnChanges {
   get entityCount()    { return this.entities.size; }
 
   visibleComponents: ComponentState[] = [];
-  visibleEntities: EntityState[] = [];
+  visibleEntities:   EntityState[]    = [];
   colLabels: number[] = [];
 
   ngOnChanges(): void {
     this.visibleComponents = [...this.components.values()];
     this.visibleEntities   = [...this.entities.values()];
-    this.colLabels = Array.from({ length: Math.floor(this.cols / 4) }, (_, i) => i);
+    this.colLabels = Array.from({ length: Math.floor(this.cols / 5) }, (_, i) => i);
   }
 
   onMouseMove(e: MouseEvent): void {
@@ -208,27 +259,25 @@ export class GridCanvasComponent implements OnChanges {
     const vy = (e.clientY - rect.top)  * (this.svgH / rect.height);
     const cx = Math.floor(vx / CELL);
     const cy = Math.floor(vy / CELL);
-    if (cx >= 0 && cx < this.cols && cy >= 0 && cy < this.rows)
-      this.hover = { x: cx, y: cy };
-    else
-      this.hover = null;
+    this.hover = (cx >= 0 && cx < this.cols && cy >= 0 && cy < this.rows)
+      ? { x: cx, y: cy } : null;
   }
 
-  onGridClick(): void {
-    this.componentSelect.emit(null);
-  }
-
-  selectComponent(c: ComponentState): void {
-    this.componentSelect.emit(c);
-  }
+  onGridClick(): void { this.componentSelect.emit(null); }
+  selectComponent(c: ComponentState): void { this.componentSelect.emit(c); }
 
   facingRot(f: Direction): number {
     return { East: 0, South: 90, West: 180, North: 270 }[f] ?? 0;
   }
 
   arrowPts(): string {
-    const x2 = CELL - 3, y = CELL / 2;
-    return `${x2-4},${y-3} ${x2},${y} ${x2-4},${y+3}`;
+    const x2 = CELL - 5, y = CELL / 2;
+    return `${x2-5},${y-3} ${x2},${y} ${x2-5},${y+3}`;
+  }
+
+  arrowPtsTurn(): string {
+    const x = CELL - 4, y = CELL / 2;
+    return `${x-4},${y-3} ${x},${y} ${x-4},${y+3}`;
   }
 
   kindColor(kind: string): string {
