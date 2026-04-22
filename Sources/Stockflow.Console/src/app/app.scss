@@ -5,6 +5,7 @@
   height: 100vh;
   overflow: hidden;
   background: var(--bg-0);
+  font-family: var(--mono);
 }
 
 .main {
@@ -15,9 +16,11 @@
 }
 
 .bottom {
-  height: var(--bottom-h);
+  height: 140px;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   overflow: hidden;
+  background: var(--bg-1);
+  border-top: 1px solid var(--border);
 }
