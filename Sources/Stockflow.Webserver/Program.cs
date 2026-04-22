@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.Options;
 using Stockflow.Protocol.Serialization;
+using Stockflow.Simulation.Core;
 using Stockflow.Webserver.Configuration;
+using Stockflow.Webserver.Hosting;
 using Stockflow.Webserver.WebSocket;
 
 MessagePackConfig.Initialize();
@@ -28,6 +31,12 @@ builder.WebHost.ConfigureKestrel(options =>
 builder.Services.AddSingleton<IClientCommandQueue, ClientCommandQueue>();
 builder.Services.AddSingleton<MessageRouter>();
 builder.Services.AddSingleton<WebSocketHandler>();
+builder.Services.AddSingleton<SimulationEngine>(sp =>
+{
+    var cfg = sp.GetRequiredService<IOptions<ServerConfig>>().Value;
+    return new SimulationEngine(cfg.GridWidth, cfg.GridLength, cfg.GridFloors);
+});
+builder.Services.AddHostedService<SimulationHostedService>();
 
 var app = builder.Build();
 

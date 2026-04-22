@@ -18,8 +18,13 @@ public sealed class ServerConfig
     /// <summary>Deployment mode — drives auth, CORS and persistence defaults downstream.</summary>
     public ServerMode Mode { get; set; } = ServerMode.Local;
 
-    /// <summary>Simulation tick rate in Hz. The hosted service (issue #11) reads this value.</summary>
+    /// <summary>Simulation tick rate in Hz.</summary>
     public int TickRate { get; set; } = 10;
+
+    /// <summary>Grid dimensions for the simulation engine.</summary>
+    public int GridWidth  { get; set; } = 50;
+    public int GridLength { get; set; } = 50;
+    public int GridFloors { get; set; } = 1;
 }
 
 public enum ServerMode
