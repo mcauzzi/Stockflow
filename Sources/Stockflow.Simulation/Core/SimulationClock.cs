@@ -11,8 +11,9 @@ public class SimulationClock
     // Phase 2: enforced at 1x when external connections are active
     public bool IsLiveMode => TimeScale == 1f;
 
-    public void Advance(float realDelta)
+    // Caller already supplies a pre-scaled delta (1f/tickRate * TimeScale).
+    public void Advance(float delta)
     {
-        _simulatedTime += realDelta * TimeScale;
+        _simulatedTime += delta;
     }
 }
