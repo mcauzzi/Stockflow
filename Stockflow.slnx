@@ -10,6 +10,7 @@
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="./Sources/Stockflow.Tests.Simulation/Stockflow.Tests.Simulation.csproj" />
+    <Project Path="./Sources/Stockflow.WsTestClient/Stockflow.WsTestClient.csproj" />
   </Folder>
   <Folder Name="/WebServer/">
     <Project Path="./Sources/Stockflow.Webserver/Stockflow.Webserver.csproj" />
