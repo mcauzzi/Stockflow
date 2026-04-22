@@ -22,7 +22,7 @@ const KIND_LABELS: Record<string, string> = {
   standalone: true,
   imports: [NgIf],
   template: `
-    <div class="inspector">
+    <div class="insp">
 
       <div class="panel-head">
         <span>INSPECTOR</span><span class="idx">F3</span>
@@ -30,71 +30,106 @@ const KIND_LABELS: Record<string, string> = {
 
       <!-- Nothing selected -->
       <ng-container *ngIf="!selected">
-        <div style="padding:18px 14px;font-size:11px;color:var(--text-3);font-family:var(--mono);line-height:1.6">
-          <div class="caps dim2" style="margin-bottom:8px">NO SELECTION</div>
-          Click a component on the grid to inspect.
+        <div class="empty">
+          <div class="caps">NO SELECTION</div>
+          <div class="hint">Click a component on the grid to inspect.</div>
         </div>
 
         <div class="panel-head"><span>ALERTS</span></div>
-        <div style="padding:0 12px 10px">
+        <div class="sec">
           <div class="alert warn">
-            <div style="display:flex;justify-content:space-between;color:var(--amber)">
-              <span style="font-weight:600;letter-spacing:.05em">WARN</span><span>BACKEND</span>
-            </div>
-            <div style="color:var(--text-2);margin-top:2px">
-              Place/Remove/Configure commands pending issue #33
-            </div>
+            <div class="alert-hd"><span>WARN</span><span>BACKEND</span></div>
+            <div class="alert-body">Place/Remove/Configure commands pending issue #33</div>
           </div>
         </div>
 
         <div class="panel-head"><span>PROTOCOL</span></div>
-        <div class="insp-rows">
-          <div class="insp-row"><div class="k">WS Endpoint</div><div class="v">ws://localhost:9600/ws</div></div>
-          <div class="insp-row"><div class="k">Codec</div><div class="v">MessagePack + LZ4</div></div>
-          <div class="insp-row"><div class="k">REST</div><div class="v">http://localhost:9601</div></div>
-          <div class="insp-row"><div class="k">Commands</div><div class="v">Speed ✓ · Place ✕</div></div>
+        <div class="sec">
+          <div class="row"><div class="k">WS Endpoint</div><div class="v">ws://localhost:9600/ws</div></div>
+          <div class="row"><div class="k">Codec</div><div class="v">MessagePack + LZ4</div></div>
+          <div class="row"><div class="k">REST</div><div class="v">http://localhost:9601</div></div>
+          <div class="row"><div class="k">Commands</div><div class="v amber">Speed ✓ &nbsp;<span class="red">Place ✕</span></div></div>
         </div>
       </ng-container>
 
       <!-- Component selected -->
       <ng-container *ngIf="selected">
-        <div style="padding:10px 12px 6px;font-family:var(--mono)">
-          <div style="font-size:10px;color:var(--text-3);letter-spacing:.08em">{{ kindLabel }}</div>
-          <div style="font-size:18px;margin-top:2px;color:var(--amber)">{{ selected.id }}</div>
-          <div style="margin-top:6px;display:flex;gap:6px">
+        <div class="sel-head">
+          <div class="kind-lbl">{{ kindLabel }}</div>
+          <div class="comp-id amber">{{ selected.id }}</div>
+          <div class="badges">
             <span class="insp-badge ok">ACTIVE</span>
             <span class="insp-badge info">{{ selected.facing }}</span>
-            <span class="insp-badge">({{ selected.gridX }},{{ selected.gridY }})</span>
+            <span class="insp-badge"
+                  style="color:var(--text-2);border-color:var(--border-bright)">
+              ({{ selected.gridX }},{{ selected.gridY }})
+            </span>
           </div>
         </div>
 
         <div class="panel-head"><span>PROPERTIES</span></div>
-        <div class="insp-rows">
-          <div class="insp-row">
-            <div class="k">Kind</div>
-            <div class="v">{{ selected.kind }}</div>
-          </div>
-          <div class="insp-row">
-            <div class="k">Grid</div>
-            <div class="v">({{ selected.gridX }}, {{ selected.gridY }})</div>
-          </div>
-          <div class="insp-row">
-            <div class="k">Facing</div>
-            <div class="v">{{ selected.facing }}</div>
-          </div>
+        <div class="sec">
+          <div class="row"><div class="k">Kind</div><div class="v">{{ selected.kind }}</div></div>
+          <div class="row"><div class="k">Grid</div><div class="v">({{ selected.gridX }}, {{ selected.gridY }})</div></div>
+          <div class="row"><div class="k">Facing</div><div class="v">{{ selected.facing }}</div></div>
         </div>
 
         <div class="panel-head"><span>NOTE</span></div>
-        <div style="padding:8px 12px;font-family:var(--mono);font-size:10px;color:var(--text-3);line-height:1.6">
-          Live telemetry and property editing available after issue #33 lands.
-        </div>
+        <div class="empty"><div class="hint">Live telemetry and property editing available after issue #33.</div></div>
       </ng-container>
 
     </div>
   `,
   styles: [`
-    .alert { padding: 6px 8px; border-left: 2px solid; margin-bottom: 4px; font-family: var(--mono); font-size: 10px; }
+    :host { display: contents; }
+    .insp {
+      width: 220px;
+      background: var(--bg-1);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+      font-family: var(--mono);
+    }
+    .empty { padding: 12px 14px; }
+    .caps { font-size: 9px; letter-spacing: .1em; color: var(--text-4); text-transform: uppercase; margin-bottom: 6px; }
+    .hint { font-size: 10px; color: var(--text-3); line-height: 1.6; }
+    .sec { padding: 6px 12px 8px; }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 4px 0;
+      border-bottom: 1px solid var(--bg-2);
+      font-size: 10px;
+    }
+    .k { font-size: 9px; color: var(--text-3); letter-spacing: .04em; }
+    .v { color: var(--text-1); }
+    .alert {
+      padding: 7px 9px;
+      border-left: 2px solid;
+      margin-bottom: 4px;
+      font-size: 10px;
+    }
     .alert.warn { border-color: var(--amber); background: rgba(245,166,35,.06); }
+    .alert-hd { display: flex; justify-content: space-between; color: var(--amber); font-weight: 600; font-size: 9px; letter-spacing: .06em; margin-bottom: 3px; }
+    .alert-body { color: var(--text-2); }
+    .sel-head { padding: 10px 12px 8px; }
+    .kind-lbl { font-size: 9px; color: var(--text-3); letter-spacing: .07em; text-transform: uppercase; }
+    .comp-id { font-size: 20px; margin-top: 2px; line-height: 1; }
+    .badges { display: flex; gap: 5px; margin-top: 7px; flex-wrap: wrap; }
+    .insp-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      font-size: 9px;
+      letter-spacing: .06em;
+      border: 1px solid;
+      text-transform: uppercase;
+    }
+    .insp-badge.ok   { color: var(--green); border-color: var(--green-dim); background: rgba(74,222,128,.06); }
+    .insp-badge.info { color: var(--cyan);  border-color: var(--cyan-dim);  background: rgba(34,211,238,.06); }
+    .insp-badge.warn { color: var(--amber); border-color: var(--amber-dim); background: rgba(245,166,35,.06); }
   `],
 })
 export class InspectorComponent {
