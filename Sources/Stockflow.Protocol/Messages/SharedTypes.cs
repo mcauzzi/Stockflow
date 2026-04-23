@@ -28,7 +28,9 @@ public readonly struct Vector3
 /// </summary>
 public static class ComponentKinds
 {
-    public const string OneWayConveyor = "conveyor_oneway";
+    public const string OneWayConveyor   = "conveyor_oneway";
+    public const string PackageGenerator = "package_generator";
+    public const string PackageExit      = "package_exit";
 }
 
 /// <summary>
@@ -82,15 +84,19 @@ public sealed record EntityState
 
 /// <summary>
 /// Network snapshot of a placed component.
+/// Properties carries component-specific parameters and metrics (e.g. spawnRate for
+/// PackageGenerator, throughput for PackageExit) so the frontend can display and
+/// update them without a dedicated message type per component kind.
 /// </summary>
 [MessagePackObject]
 public sealed record ComponentState
 {
-    [Key(0)] public int       Id     { get; init; }
-    [Key(1)] public string    Kind   { get; init; } = "";
-    [Key(2)] public int       GridX  { get; init; }
-    [Key(3)] public int       GridY  { get; init; }
-    [Key(4)] public Direction Facing { get; init; }
+    [Key(0)] public int                         Id         { get; init; }
+    [Key(1)] public string                      Kind       { get; init; } = "";
+    [Key(2)] public int                         GridX      { get; init; }
+    [Key(3)] public int                         GridY      { get; init; }
+    [Key(4)] public Direction                   Facing     { get; init; }
+    [Key(5)] public Dictionary<string, string>? Properties { get; init; }
 }
 
 /// <summary>

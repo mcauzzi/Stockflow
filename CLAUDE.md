@@ -102,12 +102,14 @@ Stockflow.Webserver
 
 Issues tracked at `mcauzzi/Stockflow`. Organised by milestone: F0 (foundations, current), F1A–D, F2, F3.
 
-**Branch workflow:** main is kept up to date via rebase. Always create feature branches from `origin/main` after a `git fetch`:
+**Branch workflow:** feature branches go through `develop` first; only after testing on develop does the work land on `main`. Always create feature branches from `origin/develop` after a `git fetch`:
 
 ```bash
-git fetch origin main
-git checkout -b claude/issue-N-short-desc origin/main
+git fetch origin develop
+git checkout -b claude/issue-N-short-desc origin/develop
 ```
+
+Once the branch is reviewed and tested, it is merged into `develop`. `develop` is then merged into `main` — never merge feature branches directly to `main`.
 
 ### Documentation
 
