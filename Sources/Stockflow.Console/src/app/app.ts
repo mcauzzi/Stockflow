@@ -2,7 +2,7 @@ import { Component, OnInit, signal, computed, effect } from '@angular/core';
 import { NgIf } from '@angular/common';
 
 import { SimStateService } from './core/services/sim-state.service';
-import { SimSpeed } from './core/models/protocol';
+import { Direction, SimSpeed } from './core/models/protocol';
 
 import { Tab, TopbarComponent } from './features/topbar/topbar.component';
 import { KpiStripComponent } from './features/kpi-strip/kpi-strip.component';
@@ -33,6 +33,7 @@ export class App implements OnInit {
   readonly activeTab    = signal<Tab>('OPERATE');
   readonly selectedComp = signal<ComponentState | null>(null);
   readonly selectedTool = signal<PaletteItem | null>(null);
+  readonly placeFacing  = signal<Direction>('North');
   readonly paused       = signal(false);
   readonly currentSpeed = signal<SimSpeed>(1);
 
@@ -79,5 +80,17 @@ export class App implements OnInit {
 
   onToolSelect(item: PaletteItem | null): void {
     this.selectedTool.set(item);
+    if (item) this.selectedComp.set(null);
+  }
+
+  onFacingChange(dir: Direction): void {
+    this.placeFacing.set(dir);
+  }
+
+  onCellClick(cell: { x: number; y: number }): void {
+    const tool = this.selectedTool();
+    if (!tool) return;
+    this.sim.placeComponent(tool.kind, cell.x, cell.y, this.placeFacing());
+    this.selectedTool.set(null);
   }
 }

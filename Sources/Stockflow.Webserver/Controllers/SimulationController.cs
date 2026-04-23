@@ -3,6 +3,7 @@ using Stockflow.Protocol.Messages;
 using Stockflow.Simulation.Component;
 using Stockflow.Simulation.Core;
 using SimComponentType = Stockflow.Simulation.Component.ComponentType;
+using ISimComponent = Stockflow.Simulation.Component.ISimComponent;
 
 namespace Stockflow.Webserver.Controllers;
 
@@ -41,12 +42,13 @@ public sealed class SimulationController(SimulationEngine engine) : ControllerBa
             gridFloors     = engine.Grid.Height,
             components     = components.Select(c => new
             {
-                id      = c.Id,
-                kind    = KindString(c.Type),
-                gridX   = c.Position.X,
-                gridY   = c.Position.Y,
-                facing  = c.Facing.ToString(),
-                occupant = c.Occupant?.Id,
+                id         = c.Id,
+                kind       = KindString(c.Type),
+                gridX      = c.Position.X,
+                gridY      = c.Position.Y,
+                facing     = c.Facing.ToString(),
+                occupant   = c.Occupant?.Id,
+                properties = BuildProperties(c),
             }),
             entityCount = entities.Count,
         });
@@ -118,10 +120,33 @@ public sealed class SimulationController(SimulationEngine engine) : ControllerBa
 
     private static string KindString(SimComponentType type) => type switch
     {
-        SimComponentType.OneWayConveyor => ComponentKinds.OneWayConveyor,
-        SimComponentType.ConveyorTurn   => "conveyor_turn",
-        _                               => type.ToString().ToLowerInvariant(),
+        SimComponentType.OneWayConveyor   => ComponentKinds.OneWayConveyor,
+        SimComponentType.ConveyorTurn     => "conveyor_turn",
+        SimComponentType.PackageGenerator => "package_generator",
+        SimComponentType.PackageExit      => "package_exit",
+        _                                 => type.ToString().ToLowerInvariant(),
     };
+
+    private static Dictionary<string, string>? BuildProperties(ISimComponent c)
+    {
+        if (c is PackageGenerator gen)
+            return new()
+            {
+                ["spawnRate"] = gen.SpawnRate.ToString("F3"),
+                ["sku"]       = gen.Sku,
+                ["weight"]    = gen.Weight.ToString("F3"),
+                ["size"]      = gen.Size.ToString("F3"),
+                ["enabled"]   = gen.IsEnabled ? "true" : "false",
+            };
+        if (c is PackageExit exit)
+            return new()
+            {
+                ["totalProcessed"]     = exit.TotalProcessed.ToString(),
+                ["throughput"]         = exit.Throughput.ToString("F3"),
+                ["avgFulfillmentTime"] = exit.AvgFulfillmentTime.ToString("F3"),
+            };
+        return null;
+    }
 }
 
 public sealed record ChangeSpeedRequest(int Speed);

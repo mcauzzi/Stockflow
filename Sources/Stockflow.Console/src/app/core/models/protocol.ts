@@ -26,6 +26,7 @@ export interface ComponentState {
   gridX: number;
   gridY: number;
   facing: Direction;
+  properties?: Record<string, string>;
 }
 
 export interface SimEvent {

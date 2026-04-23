@@ -22,7 +22,8 @@
 <div class="main" *ngIf="showMainGrid">
   <app-palette
     [selectedId]="selectedTool()?.id ?? null"
-    (itemSelect)="onToolSelect($event)">
+    (itemSelect)="onToolSelect($event)"
+    (facingChange)="onFacingChange($event)">
   </app-palette>
 
   <app-grid-canvas
@@ -31,7 +32,9 @@
     [selectedId]="selectedComp()?.id ?? null"
     [cols]="sim.gridWidth()"
     [rows]="sim.gridLength()"
-    (componentSelect)="onComponentSelect($event)">
+    [activeTool]="selectedTool()"
+    (componentSelect)="onComponentSelect($event)"
+    (cellClick)="onCellClick($event)">
   </app-grid-canvas>
 
   <app-inspector [selected]="selectedComp()"></app-inspector>
