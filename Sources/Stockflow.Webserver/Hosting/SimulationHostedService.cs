@@ -6,6 +6,7 @@ using Stockflow.Simulation.Component;
 using Stockflow.Simulation.Core;
 using Stockflow.Simulation.Grid;
 using Stockflow.Webserver.Configuration;
+using Stockflow.Webserver.Queue;
 using Stockflow.Webserver.WebSocket;
 using SimEntityState    = Stockflow.Simulation.Entity.EntityState;
 using SimComponentType  = Stockflow.Simulation.Component.ComponentType;
@@ -22,6 +23,7 @@ public sealed class SimulationHostedService : BackgroundService
 
     private readonly SimulationEngine    _engine;
     private readonly IClientCommandQueue _queue;
+    private readonly IRestCommandQueue   _restQueue;
     private readonly WebSocketHandler    _wsHandler;
     private readonly int                 _tickRate;
     private readonly ILogger<SimulationHostedService> _logger;
@@ -30,12 +32,14 @@ public sealed class SimulationHostedService : BackgroundService
     public SimulationHostedService(
         SimulationEngine                  engine,
         IClientCommandQueue               queue,
+        IRestCommandQueue                 restQueue,
         WebSocketHandler                  wsHandler,
         IOptions<ServerConfig>            config,
         ILogger<SimulationHostedService>  logger)
     {
         _engine    = engine;
         _queue     = queue;
+        _restQueue = restQueue;
         _wsHandler = wsHandler;
         _tickRate  = config.Value.TickRate;
         _logger    = logger;
@@ -49,6 +53,7 @@ public sealed class SimulationHostedService : BackgroundService
 
         while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
         {
+            DrainRestQueue();
             await DrainCommandQueueAsync(stoppingToken).ConfigureAwait(false);
 
             _engine.Tick(1f / _tickRate * _engine.TimeScale);
@@ -59,6 +64,12 @@ public sealed class SimulationHostedService : BackgroundService
         }
 
         _logger.LogInformation("Simulation tick loop stopped");
+    }
+
+    private void DrainRestQueue()
+    {
+        while (_restQueue.TryDequeue(out var cmd))
+            _engine.ProcessCommand(cmd);
     }
 
     private async ValueTask DrainCommandQueueAsync(CancellationToken ct)

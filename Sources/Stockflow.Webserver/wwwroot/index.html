@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STOCKFLOW — Simulation Control</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #07111e;
+  --surface:    #0c1928;
+  --surface2:   #101f30;
+  --border:     #1a3050;
+  --border-dim: #0f2040;
+  --accent:     #00c8d4;
+  --accent-dim: rgba(0,200,212,0.12);
+  --gen:        #00ff9d;
+  --gen-dim:    rgba(0,255,157,0.10);
+  --exit:       #ff3d5a;
+  --exit-dim:   rgba(255,61,90,0.10);
+  --entity:     #ffd700;
+  --text:       #b8cce0;
+  --text-dim:   #3d5570;
+  --text-hi:    #e8f4ff;
+  --mono:       'Courier New', 'Lucida Console', monospace;
+  --ui:         'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+  --r:          3px;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; overflow: hidden; }
+
+/* scanline atmosphere */
+body::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+}
+
+/* ── HEADER ── */
+header {
+  display: flex; align-items: center; gap: 14px;
+  height: 46px; padding: 0 18px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.brand {
+  font-family: var(--mono); font-size: 15px; font-weight: bold;
+  letter-spacing: 5px; color: var(--accent);
+  text-shadow: 0 0 14px rgba(0,200,212,0.55);
+}
+.hsep { width: 1px; height: 22px; background: var(--border); }
+.sim-time-lbl { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; color: var(--text-dim); }
+.sim-time { font-family: var(--mono); font-size: 19px; font-weight: bold; color: var(--text-hi); letter-spacing: 2px; min-width: 88px; }
+.spacer { flex: 1; }
+.status-row { display: flex; align-items: center; gap: 8px; }
+.last-upd { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; color: var(--text-dim); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gen); box-shadow: 0 0 7px var(--gen); animation: blink 2s ease-in-out infinite; }
+.dot.err { background: var(--exit); box-shadow: 0 0 7px var(--exit); animation: none; }
+.status-txt { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; color: var(--text-dim); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+/* ── BODY ── */
+.app { display: flex; height: calc(100vh - 46px); overflow: hidden; }
+
+/* ── GRID PANEL ── */
+.grid-panel {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px; flex-shrink: 0;
+  background: var(--bg); border-right: 1px solid var(--border);
+}
+.grid-bar { display: flex; justify-content: space-between; align-items: center; }
+.grid-label { font-family: var(--mono); font-size: 9px; letter-spacing: 3px; color: var(--text-dim); }
+.grid-view  { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; color: var(--accent); }
+#grid { display: block; border: 1px solid var(--border); cursor: crosshair; }
+#grid.placing { cursor: cell; }
+
+.nav-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 3px; }
+.nb {
+  background: var(--surface2); border: 1px solid var(--border-dim); border-radius: var(--r);
+  color: var(--text-dim); font-family: var(--mono); font-size: 11px; padding: 3px 0;
+  cursor: pointer; text-align: center; transition: all .12s;
+}
+.nb:hover { background: var(--border); color: var(--accent); border-color: var(--accent); }
+.nb-c { grid-column: 3; }
+
+/* ── CONTROL PANEL ── */
+.ctrl { flex:1; display:flex; flex-direction:column; gap:10px; padding:12px; overflow:hidden; min-width:300px; max-width:350px; }
+
+.sec-head {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 3px;
+  color: var(--text-dim); border-bottom: 1px solid var(--border-dim);
+  padding-bottom: 5px; margin-bottom: 6px;
+}
+
+/* ── TOOLS ── */
+.tool-row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 8px; }
+.tbtn {
+  padding: 7px 4px; border-radius: var(--r); border: 1px solid;
+  font-family: var(--mono); font-size: 10px; font-weight: bold; letter-spacing: 1.5px;
+  cursor: pointer; text-align: center; transition: all .13s;
+}
+.tbtn.gen { background: var(--gen-dim); border-color: var(--gen); color: var(--gen); }
+.tbtn.gen:hover, .tbtn.gen.on { background: var(--gen); color: #000; box-shadow: 0 0 10px rgba(0,255,157,.4); }
+.tbtn.exi { background: var(--exit-dim); border-color: var(--exit); color: var(--exit); }
+.tbtn.exi:hover, .tbtn.exi.on { background: var(--exit); color: #fff; box-shadow: 0 0 10px rgba(255,61,90,.4); }
+
+/* ── PLACE FORM ── */
+.pform {
+  display: none; flex-direction: column; gap: 7px;
+  background: var(--surface2); border: 1px solid var(--border-dim);
+  border-radius: var(--r); padding: 9px;
+}
+.pform.show { display: flex; }
+.fr { display: flex; align-items: center; gap: 7px; }
+.fr label { font-family: var(--mono); font-size: 10px; color: var(--text-dim); letter-spacing: 1px; min-width: 65px; text-transform: uppercase; }
+.fr input, .fr select {
+  flex: 1; background: var(--bg); border: 1px solid var(--border-dim);
+  border-radius: var(--r); color: var(--text); font-family: var(--mono); font-size: 12px;
+  padding: 3px 7px; outline: none;
+}
+.fr input:focus, .fr select:focus { border-color: var(--accent); }
+.phint { font-family: var(--mono); font-size: 10px; color: var(--accent); text-align: center; }
+.phint.flash { animation: ab .5s ease; }
+@keyframes ab { 0%{color:var(--gen)} 100%{color:var(--accent)} }
+.pcx { background:transparent; border:1px solid var(--border-dim); color:var(--text-dim); font-family:var(--mono); font-size:10px; padding:3px; border-radius:var(--r); cursor:pointer; transition:all .12s; }
+.pcx:hover { border-color:var(--exit); color:var(--exit); }
+
+/* ── COMPONENT LIST ── */
+.comp-sec { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.clist { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:7px; padding-right:3px; }
+.clist::-webkit-scrollbar { width:3px; }
+.clist::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--surface2); border: 1px solid var(--border-dim);
+  border-radius: var(--r); overflow: hidden; transition: border-color .13s;
+}
+.card:hover { border-color: var(--border); }
+.card.sel { border-color: var(--accent); }
+.card.gen { border-left: 3px solid var(--gen); }
+.card.exi { border-left: 3px solid var(--exit); }
+
+.ch { display:flex; align-items:center; gap:5px; padding:6px 9px; background:rgba(0,0,0,.18); cursor:pointer; }
+.ctag { font-family:var(--mono); font-size:9px; font-weight:bold; letter-spacing:2px; padding:2px 5px; border-radius:2px; }
+.ctag.g { background:var(--gen-dim); color:var(--gen); border:1px solid rgba(0,255,157,.25); }
+.ctag.e { background:var(--exit-dim); color:var(--exit); border:1px solid rgba(255,61,90,.25); }
+.cid { font-family:var(--mono); font-size:11px; color:var(--text-dim); }
+.cpos { font-family:var(--mono); font-size:11px; color:var(--text); }
+.cdir { font-family:var(--mono); font-size:13px; color:var(--text-dim); margin-left:1px; }
+.cst { margin-left:auto; font-family:var(--mono); font-size:9px; letter-spacing:1px; }
+.on { color:var(--gen); } .off { color:var(--text-dim); }
+
+.cbody { padding:7px 9px; }
+.gfields { display:flex; flex-direction:column; gap:5px; margin-bottom:7px; }
+.gfr { display:flex; align-items:center; gap:7px; }
+.gfr label { font-family:var(--mono); font-size:10px; color:var(--text-dim); min-width:55px; text-transform:uppercase; letter-spacing:1px; }
+.gfr input { flex:1; background:var(--bg); border:1px solid var(--border-dim); border-radius:var(--r); color:var(--text); font-family:var(--mono); font-size:12px; padding:3px 6px; outline:none; }
+.gfr input:focus { border-color:var(--accent); }
+.cacts { display:flex; gap:5px; }
+.bsv, .btg {
+  font-family:var(--mono); font-size:10px; letter-spacing:1px;
+  padding:3px 9px; border-radius:var(--r); cursor:pointer; border:1px solid; transition:all .12s;
+}
+.bsv { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+.bsv:hover { background:var(--accent); color:#000; }
+.btg { background:transparent; border-color:var(--border); color:var(--text-dim); }
+.btg:hover { border-color:var(--exit); color:var(--exit); }
+.btg.is-on { border-color:var(--gen); color:var(--gen); }
+.btg.is-on:hover { background:var(--gen-dim); }
+
+/* exit metrics */
+.mrow { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; padding:7px 9px 10px; }
+.met { text-align:center; }
+.mval {
+  font-family:var(--mono); font-size:18px; font-weight:bold; color:var(--text-hi);
+  line-height:1; transition:color .3s;
+}
+.mval.flash { animation:mflash .5s ease; }
+@keyframes mflash { 0%,100%{color:var(--text-hi)} 50%{color:var(--exit)} }
+.munit { font-size:11px; color:var(--text-dim); }
+.mlbl { font-family:var(--mono); font-size:8px; color:var(--text-dim); letter-spacing:1.5px; margin-top:2px; }
+
+/* empty */
+.empty { padding:20px; text-align:center; color:var(--text-dim); font-family:var(--mono); font-size:11px; letter-spacing:1px; line-height:2; }
+
+/* footer */
+.fbar { display:flex; justify-content:space-between; padding-top:7px; border-top:1px solid var(--border-dim); flex-shrink:0; }
+.fstat { font-family:var(--mono); font-size:9px; color:var(--text-dim); letter-spacing:1px; }
+
+/* error */
+.errbanner {
+  position:fixed; bottom:0; left:0; right:0;
+  background:rgba(255,61,90,.92); color:#fff;
+  font-family:var(--mono); font-size:11px; letter-spacing:2px;
+  padding:7px 20px; text-align:center;
+  transform:translateY(100%); transition:transform .25s ease;
+  z-index:1000;
+}
+.errbanner.show { transform:translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">STOCKFLOW</div>
+  <div class="hsep"></div>
+  <span class="sim-time-lbl">SIM·TIME</span>
+  <div class="sim-time" id="simTime">00:00.0</div>
+  <div class="spacer"></div>
+  <div class="status-row">
+    <span class="last-upd" id="lastUpd">—</span>
+    <div class="dot" id="dot"></div>
+    <span class="status-txt" id="stxt">CONNECTING</span>
+  </div>
+</header>
+
+<div class="app">
+  <!-- GRID -->
+  <div class="grid-panel">
+    <div class="grid-bar">
+      <span class="grid-label">WAREHOUSE FLOOR</span>
+      <span class="grid-view" id="gv">VIEW (0,0)</span>
+    </div>
+    <canvas id="grid"></canvas>
+    <div class="nav-grid">
+      <div></div>
+      <button class="nb" id="nN">↑</button>
+      <div></div><div></div><div></div>
+      <button class="nb" id="nW">←</button>
+      <button class="nb nb-c" id="nR">⌂</button>
+      <button class="nb" id="nE">→</button>
+      <div></div><div></div>
+      <div></div>
+      <button class="nb" id="nS">↓</button>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="ctrl">
+    <!-- Place -->
+    <div>
+      <div class="sec-head">PLACE COMPONENT</div>
+      <div class="tool-row">
+        <button class="tbtn gen" id="tGen">+ GENERATOR</button>
+        <button class="tbtn exi" id="tExi">+ EXIT</button>
+      </div>
+      <div class="pform" id="pf">
+        <div class="fr">
+          <label>Facing</label>
+          <select id="pFacing">
+            <option value="North">↑ North</option>
+            <option value="East">→ East</option>
+            <option value="South">↓ South</option>
+            <option value="West">← West</option>
+          </select>
+        </div>
+        <div id="gonly">
+          <div class="fr" style="margin-bottom:4px">
+            <label>Rate/s</label>
+            <input type="number" id="pRate" value="1" step="0.1" min="0.1" max="20">
+          </div>
+          <div class="fr">
+            <label>SKU</label>
+            <input type="text" id="pSku" value="PKG" maxlength="8">
+          </div>
+        </div>
+        <div class="phint" id="phint">← CLICK A CELL TO PLACE →</div>
+        <button class="pcx" id="pCancel">✕ CANCEL</button>
+      </div>
+    </div>
+
+    <!-- List -->
+    <div class="comp-sec">
+      <div class="sec-head">COMPONENTS</div>
+      <div class="clist" id="clist">
+        <div class="empty">NO COMPONENTS<br>USE + GENERATOR OR + EXIT<br>TO BEGIN</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="fbar">
+      <span class="fstat" id="fEnt">0 ENTITIES</span>
+      <span class="fstat" id="fComp">0 COMPONENTS</span>
+    </div>
+  </div>
+</div>
+
+<div class="errbanner" id="err">⚠ SERVER UNREACHABLE — RETRYING...</div>
+
+<script>
+'use strict';
+
+// ── constants ────────────────────────────────────────────────────────────────
+const CS    = 28;   // cell size px
+const VIS   = 20;   // visible cells
+const POLL  = 1000; // ms
+
+// ── state ────────────────────────────────────────────────────────────────────
+let S    = { components: [], entities: [], simulationTime: 0, gridWidth: 50, gridLength: 50 };
+let view = { x: 0, y: 0 };
+let tool = null;  // 'gen' | 'exi' | null
+let selId  = null;
+let ok     = false;
+let lastTs = 0;
+let prevProc = {}; // compId → totalProcessed string
+
+// ── canvas ───────────────────────────────────────────────────────────────────
+const cv  = document.getElementById('grid');
+const ctx = cv.getContext('2d');
+cv.width  = CV_W = CS * VIS;
+cv.height = CV_H = CS * VIS;
+
+// colours
+const BG   = '#07111e';
+const GL   = '#0c1d2e';
+const SGEN = '#00ff9d';
+const SEXI = '#ff3d5a';
+const SSEL = '#00c8d4';
+const SENT = '#ffd700';
+const SDIS = '#2a3e52';
+const FDIS = '#3a5568';
+
+// ── draw ─────────────────────────────────────────────────────────────────────
+let hovered = null;
+
+function draw() {
+  ctx.clearRect(0, 0, CV_W, CV_H);
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, CV_W, CV_H);
+
+  // grid lines
+  ctx.strokeStyle = GL; ctx.lineWidth = 0.5;
+  for (let i = 0; i <= VIS; i++) {
+    const v = i * CS;
+    ctx.beginPath(); ctx.moveTo(v, 0);    ctx.lineTo(v, CV_H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, v);    ctx.lineTo(CV_W, v); ctx.stroke();
+  }
+
+  // coord labels every 5
+  ctx.fillStyle = 'rgba(0,200,212,.18)'; ctx.font = '7px monospace';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  for (let ix = 0; ix < VIS; ix++)
+    for (let iy = 0; iy < VIS; iy++) {
+      const gx = ix + view.x, gy = iy + view.y;
+      if (gx % 5 === 0 && gy % 5 === 0)
+        ctx.fillText(`${gx},${gy}`, ix*CS+2, iy*CS+2);
+    }
+
+  // components
+  for (const c of S.components) {
+    const cx = c.gridX - view.x, cy = c.gridY - view.y;
+    if (cx < 0 || cx >= VIS || cy < 0 || cy >= VIS) continue;
+    const px = cx*CS, py = cy*CS, pd = 2, sw = CS-pd*2, sh = CS-pd*2;
+    const isGen = c.kind === 'package_generator';
+    const isExi = c.kind === 'package_exit';
+    const disabled = isGen && c.properties?.enabled === 'false';
+    const isSel = c.id === selId;
+    const fg = disabled ? FDIS : isGen ? SGEN : isExi ? SEXI : '#0088ff';
+    const bg = disabled ? SDIS : isGen ? 'rgba(0,255,157,.09)' : isExi ? 'rgba(255,61,90,.09)' : 'rgba(0,136,255,.07)';
+
+    ctx.fillStyle = bg; ctx.fillRect(px+pd, py+pd, sw, sh);
+    ctx.shadowColor = isSel ? SSEL : fg; ctx.shadowBlur = isSel ? 10 : (disabled ? 0 : 3);
+    ctx.strokeStyle = isSel ? SSEL : fg; ctx.lineWidth = isSel ? 1.5 : 1;
+    ctx.strokeRect(px+pd, py+pd, sw, sh);
+    ctx.shadowBlur = 0;
+
+    // arrow
+    const mx = px+CS/2, my = py+CS/2-3, a = CS*0.21;
+    ctx.fillStyle = fg; ctx.beginPath();
+    switch(c.facing) {
+      case 'North': ctx.moveTo(mx, my-a);   ctx.lineTo(mx-a*.7, my+a*.6); ctx.lineTo(mx+a*.7, my+a*.6); break;
+      case 'South': ctx.moveTo(mx, my+a);   ctx.lineTo(mx-a*.7, my-a*.6); ctx.lineTo(mx+a*.7, my-a*.6); break;
+      case 'East':  ctx.moveTo(mx+a, my);   ctx.lineTo(mx-a*.6, my-a*.7); ctx.lineTo(mx-a*.6, my+a*.7); break;
+      case 'West':  ctx.moveTo(mx-a, my);   ctx.lineTo(mx+a*.6, my-a*.7); ctx.lineTo(mx+a*.6, my+a*.7); break;
+    }
+    ctx.closePath(); ctx.fill();
+
+    // label
+    ctx.globalAlpha = disabled ? .35 : 1;
+    ctx.fillStyle = fg;
+    ctx.font = `bold ${Math.floor(CS*.22)}px 'Courier New',monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText(isGen ? 'GEN' : isExi ? 'EXIT' : c.kind.slice(0,4).toUpperCase(), px+CS/2, py+CS-pd-1);
+    ctx.globalAlpha = 1;
+  }
+
+  // entities
+  for (const e of S.entities) {
+    const comp = S.components.find(c => c.id === e.componentId);
+    if (!comp) continue;
+    const cx = comp.gridX - view.x, cy = comp.gridY - view.y;
+    if (cx < 0 || cx >= VIS || cy < 0 || cy >= VIS) continue;
+    const px = cx*CS, py = cy*CS;
+    const p = Math.max(0, Math.min(1, e.progress ?? 0));
+    let ex = px+CS/2, ey = py+CS/2;
+    switch(comp.facing) {
+      case 'North': ey = py + CS*(1-p); break;
+      case 'South': ey = py + CS*p;     break;
+      case 'East':  ex = px + CS*p;     break;
+      case 'West':  ex = px + CS*(1-p); break;
+    }
+    ctx.beginPath(); ctx.arc(ex, ey, 3.5, 0, Math.PI*2);
+    ctx.fillStyle = SENT; ctx.shadowColor = SENT; ctx.shadowBlur = 6;
+    ctx.fill(); ctx.shadowBlur = 0;
+  }
+
+  // hover ghost
+  if (tool && hovered) {
+    const hx = (hovered.x - view.x)*CS, hy = (hovered.y - view.y)*CS;
+    if (hx >= 0 && hy >= 0 && hx < CV_W && hy < CV_H) {
+      ctx.strokeStyle = tool === 'gen' ? SGEN : SEXI;
+      ctx.lineWidth = 1.5; ctx.setLineDash([4,4]);
+      ctx.strokeRect(hx+1, hy+1, CS-2, CS-2);
+      ctx.setLineDash([]);
+    }
+  }
+}
+
+// ── canvas events ─────────────────────────────────────────────────────────────
+cv.addEventListener('mousemove', e => {
+  if (!tool) { hovered = null; return; }
+  const r = cv.getBoundingClientRect();
+  hovered = { x: Math.floor((e.clientX-r.left)/CS)+view.x, y: Math.floor((e.clientY-r.top)/CS)+view.y };
+  draw();
+});
+cv.addEventListener('mouseleave', () => { hovered = null; draw(); });
+
+cv.addEventListener('click', e => {
+  const r = cv.getBoundingClientRect();
+  const gx = Math.floor((e.clientX-r.left)/CS)+view.x;
+  const gy = Math.floor((e.clientY-r.top) /CS)+view.y;
+  if (tool) { doPlace(gx, gy); return; }
+  const hit = S.components.find(c => c.gridX===gx && c.gridY===gy);
+  selId = hit ? (selId===hit.id ? null : hit.id) : null;
+  if (selId) {
+    const comp = hit;
+    view.x = Math.max(0, Math.min(S.gridWidth-VIS,  comp.gridX - Math.floor(VIS/2)));
+    view.y = Math.max(0, Math.min(S.gridLength-VIS, comp.gridY - Math.floor(VIS/2)));
+    updateGV();
+  }
+  draw(); renderList();
+});
+
+// ── placement ────────────────────────────────────────────────────────────────
+async function doPlace(gx, gy) {
+  const facing = document.getElementById('pFacing').value;
+  const body   = tool === 'gen'
+    ? { kind:'package_generator', gridX:gx, gridY:gy, facing,
+        spawnRate: +document.getElementById('pRate').value||1,
+        sku: document.getElementById('pSku').value.trim()||'PKG',
+        weight:1, size:1 }
+    : { kind:'package_exit', gridX:gx, gridY:gy, facing };
+  try {
+    await fetch('/api/components', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    const h = document.getElementById('phint');
+    h.textContent = '✓ PLACED — CLICK ANOTHER OR CANCEL';
+    h.classList.add('flash'); setTimeout(()=>h.classList.remove('flash'),500);
+    h.style.color='var(--gen)'; setTimeout(()=>{h.style.color='';h.textContent='← CLICK A CELL TO PLACE →';},1600);
+  } catch { showErr(); }
+}
+
+// ── configure ────────────────────────────────────────────────────────────────
+async function doConfigure(id, props) {
+  try {
+    await fetch(`/api/components/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(props)});
+  } catch { showErr(); }
+}
+
+// ── tool selection ────────────────────────────────────────────────────────────
+function setTool(t) {
+  tool = t;
+  document.getElementById('tGen').classList.toggle('on', t==='gen');
+  document.getElementById('tExi').classList.toggle('on', t==='exi');
+  document.getElementById('pf').classList.toggle('show', !!t);
+  document.getElementById('gonly').style.display = t==='gen' ? '' : 'none';
+  cv.className = t ? 'placing' : '';
+  const h = document.getElementById('phint');
+  h.textContent='← CLICK A CELL TO PLACE →'; h.style.color='';
+}
+
+document.getElementById('tGen').addEventListener('click',   () => setTool(tool==='gen' ? null : 'gen'));
+document.getElementById('tExi').addEventListener('click',   () => setTool(tool==='exi' ? null : 'exi'));
+document.getElementById('pCancel').addEventListener('click',() => setTool(null));
+
+// ── navigation ────────────────────────────────────────────────────────────────
+function pan(dx,dy) {
+  view.x = Math.max(0, Math.min(S.gridWidth-VIS,  view.x+dx));
+  view.y = Math.max(0, Math.min(S.gridLength-VIS, view.y+dy));
+  updateGV(); draw();
+}
+function updateGV() { document.getElementById('gv').textContent = `VIEW (${view.x},${view.y})`; }
+
+document.getElementById('nN').addEventListener('click', () => pan(0,-5));
+document.getElementById('nS').addEventListener('click', () => pan(0, 5));
+document.getElementById('nW').addEventListener('click', () => pan(-5,0));
+document.getElementById('nE').addEventListener('click', () => pan( 5,0));
+document.getElementById('nR').addEventListener('click', () => { view={x:0,y:0}; pan(0,0); });
+
+// ── component list ────────────────────────────────────────────────────────────
+const DA = { North:'↑', East:'→', South:'↓', West:'←' };
+
+function renderList() {
+  const el = document.getElementById('clist');
+  if (!S.components.length) {
+    el.innerHTML = '<div class="empty">NO COMPONENTS<br>USE + GENERATOR OR + EXIT<br>TO BEGIN</div>';
+    return;
+  }
+  el.innerHTML = S.components.map(c => {
+    const isGen = c.kind === 'package_generator';
+    const isExi = c.kind === 'package_exit';
+    const isSel = c.id === selId;
+    const p = c.properties ?? {};
+    const dir = DA[c.facing] ?? '?';
+
+    if (isGen) {
+      const en = p.enabled !== 'false';
+      return `<div class="card gen${isSel?' sel':''}" onclick="clickCard(${c.id})">
+        <div class="ch">
+          <span class="ctag g">GEN</span>
+          <span class="cid">#${c.id}</span>
+          <span class="cpos">(${c.gridX},${c.gridY})</span>
+          <span class="cdir">${dir}</span>
+          <span class="cst ${en?'on':'off'}" style="margin-left:auto">${en?'● ON':'○ OFF'}</span>
+        </div>
+        <div class="cbody">
+          <div class="gfields">
+            <div class="gfr"><label>Rate/s</label><input type="number" step="0.1" min="0.1" max="20" id="r${c.id}" value="${(+p.spawnRate||1).toFixed(2)}"></div>
+            <div class="gfr"><label>SKU</label><input type="text" maxlength="8" id="s${c.id}" value="${p.sku||'PKG'}"></div>
+          </div>
+          <div class="cacts">
+            <button class="btg${en?' is-on':''}" onclick="event.stopPropagation();doToggle(${c.id},${en})">${en?'DISABLE':'ENABLE'}</button>
+            <button class="bsv" onclick="event.stopPropagation();doSave(${c.id})">SAVE</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    if (isExi) {
+      const tot  = p.totalProcessed ?? '0';
+      const thru = (+p.throughput||0).toFixed(2);
+      const avg  = (+p.avgFulfillmentTime||0).toFixed(1);
+      const fl   = prevProc[c.id] !== undefined && prevProc[c.id] !== tot;
+      return `<div class="card exi${isSel?' sel':''}" onclick="clickCard(${c.id})">
+        <div class="ch">
+          <span class="ctag e">EXIT</span>
+          <span class="cid">#${c.id}</span>
+          <span class="cpos">(${c.gridX},${c.gridY})</span>
+          <span class="cdir">${dir}</span>
+        </div>
+        <div class="mrow">
+          <div class="met"><div class="mval${fl?' flash':''}">${tot}</div><div class="mlbl">PROCESSED</div></div>
+          <div class="met"><div class="mval">${thru}<span class="munit">/s</span></div><div class="mlbl">THROUGHPUT</div></div>
+          <div class="met"><div class="mval">${avg}<span class="munit">s</span></div><div class="mlbl">AVG TIME</div></div>
+        </div>
+      </div>`;
+    }
+
+    return `<div class="card${isSel?' sel':''}" onclick="clickCard(${c.id})">
+      <div class="ch">
+        <span class="ctag" style="background:rgba(0,136,255,.1);color:#0088ff;border:1px solid rgba(0,136,255,.25)">${c.kind.slice(0,5).toUpperCase()}</span>
+        <span class="cid">#${c.id}</span><span class="cpos">(${c.gridX},${c.gridY})</span><span class="cdir">${dir}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // track prev processed for flash
+  S.components.filter(c=>c.kind==='package_exit').forEach(c=>{ prevProc[c.id]=c.properties?.totalProcessed??'0'; });
+}
+
+function clickCard(id) {
+  selId = selId===id ? null : id;
+  if (selId) {
+    const c = S.components.find(x=>x.id===id);
+    if (c) {
+      view.x=Math.max(0,Math.min(S.gridWidth-VIS,c.gridX-Math.floor(VIS/2)));
+      view.y=Math.max(0,Math.min(S.gridLength-VIS,c.gridY-Math.floor(VIS/2)));
+      updateGV();
+    }
+  }
+  draw(); renderList();
+}
+
+function doSave(id) {
+  const ri = document.getElementById(`r${id}`);
+  const si = document.getElementById(`s${id}`);
+  if (!ri||!si) return;
+  const props = {};
+  const rate = parseFloat(ri.value);
+  if (!isNaN(rate) && rate>0) props.spawnRate = rate.toFixed(3);
+  const sku = si.value.trim();
+  if (sku) props.sku = sku;
+  if (Object.keys(props).length) doConfigure(id, props);
+}
+
+function doToggle(id, currentlyOn) {
+  doConfigure(id, { enabled: currentlyOn ? 'false' : 'true' });
+}
+
+// ── poll ─────────────────────────────────────────────────────────────────────
+async function poll() {
+  try {
+    const res = await fetch('/api/state');
+    if (!res.ok) throw new Error();
+    S = await res.json();
+    setOk(true); lastTs = Date.now();
+    document.getElementById('simTime').textContent = fmt(S.simulationTime);
+    document.getElementById('fEnt').textContent    = `${S.entities?.length??0} ENTITIES`;
+    document.getElementById('fComp').textContent   = `${S.components?.length??0} COMPONENTS`;
+    renderList(); draw();
+  } catch { setOk(false); }
+  setTimeout(poll, POLL);
+}
+
+// last-updated ticker
+setInterval(()=>{
+  if (!lastTs) return;
+  const ago = Math.round((Date.now()-lastTs)/1000);
+  document.getElementById('lastUpd').textContent = ago<2?'LIVE':`${ago}s AGO`;
+}, 500);
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+function fmt(s) {
+  if (!s && s!==0) return '00:00.0';
+  const m=Math.floor(s/60), sec=Math.floor(s%60), ds=Math.floor((s%1)*10);
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}.${ds}`;
+}
+
+function setOk(v) {
+  if (ok===v) return; ok=v;
+  document.getElementById('dot').classList.toggle('err',!v);
+  document.getElementById('stxt').textContent = v?'LIVE':'ERR';
+  document.getElementById('err').classList.toggle('show',!v);
+}
+
+function showErr() {
+  document.getElementById('err').classList.add('show');
+  setTimeout(()=>document.getElementById('err').classList.remove('show'),3000);
+}
+
+// ── keyboard ──────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)) return;
+  switch(e.key) {
+    case 'g': case 'G': document.getElementById('tGen').click(); break;
+    case 'x': case 'X': document.getElementById('tExi').click(); break;
+    case 'Escape': setTool(null); selId=null; draw(); renderList(); break;
+    case 'ArrowUp':    e.preventDefault(); pan(0,-1); break;
+    case 'ArrowDown':  e.preventDefault(); pan(0, 1); break;
+    case 'ArrowLeft':  e.preventDefault(); pan(-1,0); break;
+    case 'ArrowRight': e.preventDefault(); pan( 1,0); break;
+  }
+});
+
+// ── init ──────────────────────────────────────────────────────────────────────
+draw();
+poll();
+</script>
+</body>
+</html>
