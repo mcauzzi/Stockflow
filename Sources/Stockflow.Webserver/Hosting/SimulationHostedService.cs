@@ -1,12 +1,15 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using Stockflow.Protocol.Messages;
+using Stockflow.Simulation.Commands;
 using Stockflow.Simulation.Component;
 using Stockflow.Simulation.Core;
+using Stockflow.Simulation.Grid;
 using Stockflow.Webserver.Configuration;
 using Stockflow.Webserver.WebSocket;
-using SimEntityState   = Stockflow.Simulation.Entity.EntityState;
-using SimComponentType = Stockflow.Simulation.Component.ComponentType;
+using SimEntityState    = Stockflow.Simulation.Entity.EntityState;
+using SimComponentType  = Stockflow.Simulation.Component.ComponentType;
+using SimDirection      = Stockflow.Simulation.Component.Direction;
 using ProtoEntityStatus = Stockflow.Protocol.Messages.EntityStatus;
 using ProtoDirection    = Stockflow.Protocol.Messages.Direction;
 
@@ -77,8 +80,37 @@ public sealed class SimulationHostedService : BackgroundService
                 await session.SendAsync(Ack(msg.CommandId), ct).ConfigureAwait(false);
                 return;
 
+            case PlaceComponentMessage place:
+            {
+                ICommand? cmd = place.Kind switch
+                {
+                    ComponentKinds.PackageGenerator => new PlacePackageGeneratorCommand(
+                        new GridCoord(place.GridX, place.GridY),
+                        (SimDirection)(int)place.Direction),
+                    ComponentKinds.PackageExit => new PlacePackageExitCommand(
+                        new GridCoord(place.GridX, place.GridY),
+                        (SimDirection)(int)place.Direction),
+                    _ => null,
+                };
+                if (cmd is null)
+                {
+                    await session.SendAsync(Nack(msg.CommandId, $"Unknown component kind: {place.Kind}"), ct).ConfigureAwait(false);
+                    return;
+                }
+                var result = _engine.ProcessCommand(cmd);
+                await session.SendAsync(result.Success ? Ack(msg.CommandId) : Nack(msg.CommandId, result.ErrorMessage!), ct).ConfigureAwait(false);
+                return;
+            }
+
+            case ConfigureComponentMessage configure:
+            {
+                var result = _engine.ProcessCommand(new ConfigureComponentCommand(
+                    configure.ComponentId, configure.Properties));
+                await session.SendAsync(result.Success ? Ack(msg.CommandId) : Nack(msg.CommandId, result.ErrorMessage!), ct).ConfigureAwait(false);
+                return;
+            }
+
             default:
-                // Concrete command translation is implemented in #33
                 await session.SendAsync(
                     Nack(msg.CommandId, $"Not implemented: {msg.GetType().Name}"),
                     ct).ConfigureAwait(false);
@@ -89,6 +121,13 @@ public sealed class SimulationHostedService : BackgroundService
     private StateDeltaMessage BuildDeltaMessage(StateDelta delta)
     {
         var byId = _engine.State.Components.ToDictionary(c => c.Id);
+
+        // Include PackageExit components in every delta so metrics stay current on the client
+        var updatedComponents = _engine.State.Components
+            .Where(c => c.Type == SimComponentType.PackageExit)
+            .Select(ToProtoComponent)
+            .ToArray();
+
         return new StateDeltaMessage
         {
             ServerTime          = ServerTime,
@@ -101,6 +140,7 @@ public sealed class SimulationHostedService : BackgroundService
                 .Where(byId.ContainsKey)
                 .Select(id => ToProtoComponent(byId[id]))],
             RemovedComponentIds = [..delta.RemovedComponentIds],
+            UpdatedComponents   = updatedComponents,
         };
     }
 
@@ -141,16 +181,40 @@ public sealed class SimulationHostedService : BackgroundService
 
     private static ComponentState ToProtoComponent(ISimComponent c) => new()
     {
-        Id     = c.Id,
-        Kind   = KindString(c.Type),
-        GridX  = c.Position.X,
-        GridY  = c.Position.Y,
-        Facing = (ProtoDirection)(int)c.Facing,
+        Id         = c.Id,
+        Kind       = KindString(c.Type),
+        GridX      = c.Position.X,
+        GridY      = c.Position.Y,
+        Facing     = (ProtoDirection)(int)c.Facing,
+        Properties = BuildProperties(c),
     };
+
+    private static Dictionary<string, string>? BuildProperties(ISimComponent c)
+    {
+        if (c is PackageGenerator gen)
+            return new()
+            {
+                ["spawnRate"] = gen.SpawnRate.ToString("F3"),
+                ["sku"]       = gen.Sku,
+                ["weight"]    = gen.Weight.ToString("F3"),
+                ["size"]      = gen.Size.ToString("F3"),
+                ["enabled"]   = gen.IsEnabled ? "true" : "false",
+            };
+        if (c is PackageExit exit)
+            return new()
+            {
+                ["totalProcessed"]     = exit.TotalProcessed.ToString(),
+                ["throughput"]         = exit.Throughput.ToString("F3"),
+                ["avgFulfillmentTime"] = exit.AvgFulfillmentTime.ToString("F3"),
+            };
+        return null;
+    }
 
     private static string KindString(SimComponentType type) => type switch
     {
-        SimComponentType.OneWayConveyor => ComponentKinds.OneWayConveyor,
-        _                               => type.ToString(),
+        SimComponentType.OneWayConveyor   => ComponentKinds.OneWayConveyor,
+        SimComponentType.PackageGenerator => ComponentKinds.PackageGenerator,
+        SimComponentType.PackageExit      => ComponentKinds.PackageExit,
+        _                                 => type.ToString(),
     };
 }

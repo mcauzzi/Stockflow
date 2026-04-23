@@ -4,4 +4,6 @@ public enum ComponentType
 {
     OneWayConveyor,
     ConveyorTurn,
+    PackageGenerator,
+    PackageExit,
 }
