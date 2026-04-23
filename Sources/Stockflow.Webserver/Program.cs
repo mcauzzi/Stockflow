@@ -2,8 +2,10 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Options;
 using Stockflow.Protocol.Serialization;
 using Stockflow.Simulation.Core;
+using Stockflow.Webserver.Api;
 using Stockflow.Webserver.Configuration;
 using Stockflow.Webserver.Hosting;
+using Stockflow.Webserver.Queue;
 using Stockflow.Webserver.WebSocket;
 
 MessagePackConfig.Initialize();
@@ -29,6 +31,7 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 builder.Services.AddSingleton<IClientCommandQueue, ClientCommandQueue>();
+builder.Services.AddSingleton<IRestCommandQueue, RestCommandQueue>();
 builder.Services.AddSingleton<MessageRouter>();
 builder.Services.AddSingleton<WebSocketHandler>();
 builder.Services.AddSingleton<SimulationEngine>(sp =>
@@ -49,6 +52,9 @@ var app = builder.Build();
 
 app.UseCors();
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.UseWebSockets(new WebSocketOptions
 {
     KeepAliveInterval = TimeSpan.FromSeconds(30),
@@ -66,5 +72,6 @@ app.MapGet("/api/health", (WebSocketHandler handler) => Results.Ok(new
 }));
 
 app.MapControllers();
+ApiEndpoints.Map(app);
 
 app.Run();
