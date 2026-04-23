@@ -41,6 +41,10 @@ export const INITIAL_EVENTS: MockEvent[] = [
 ];
 
 export const COMPONENT_LIBRARY = [
+  { group: 'SOURCES & SINKS', items: [
+    { id: 'pkg-gen',  name: 'Pkg Generator', sym: '⊕', cost:  500, hotkey: 'G', kind: 'package_generator', live: true  },
+    { id: 'pkg-exit', name: 'Pkg Exit',      sym: '⊗', cost:  300, hotkey: 'X', kind: 'package_exit',      live: true  },
+  ]},
   { group: 'CONVEYORS', items: [
     { id: 'conv',   name: 'Straight',    sym: '━', cost: 100,  hotkey: '1', kind: 'conveyor_oneway', live: true  },
     { id: 'curve',  name: 'Curve 90°',   sym: '┗', cost: 120,  hotkey: '2', kind: 'conveyor_turn',   live: true  },

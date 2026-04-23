@@ -1,6 +1,7 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { NgFor, NgIf, DecimalPipe } from '@angular/common';
 import { COMPONENT_LIBRARY } from '../../core/mock/sim-mock';
+import { Direction } from '../../core/models/protocol';
 
 export interface PaletteItem {
   id: string; name: string; sym: string; cost: number;
@@ -43,8 +44,19 @@ export interface PaletteItem {
         </ng-container>
       </div>
 
+      <!-- Facing selector (shown when a live component is selected) -->
+      <div class="facing" *ngIf="selectedId">
+        <div class="facing-lbl">FACING</div>
+        <div class="facing-btns">
+          <button *ngFor="let d of directions"
+                  class="dbtn" [class.on]="selectedFacing === d"
+                  [title]="d"
+                  (click)="setFacing(d)">{{ d[0] }}</button>
+        </div>
+      </div>
+
       <div class="note">
-        <span class="dim2">✕ = backend not yet implemented · issue #33</span>
+        <span class="dim2">✕ = backend not yet implemented</span>
       </div>
     </div>
   `,
@@ -106,6 +118,31 @@ export interface PaletteItem {
     .cost { font-size: 9px; color: var(--text-3); margin-top: 1px; }
     .x { color: var(--red); font-size: 9px; margin-left: 3px; }
     .hk { font-size: 8px; color: var(--text-4); flex-shrink: 0; }
+    .facing {
+      padding: 6px 10px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-0);
+    }
+    .facing-lbl {
+      font-size: 8px;
+      color: var(--text-4);
+      letter-spacing: .08em;
+      margin-bottom: 5px;
+    }
+    .facing-btns { display: flex; gap: 3px; }
+    .dbtn {
+      flex: 1;
+      padding: 5px 0;
+      border: 1px solid var(--border-bright);
+      background: transparent;
+      color: var(--text-3);
+      font-family: var(--mono);
+      font-size: 10px;
+      cursor: pointer;
+      transition: all .1s;
+    }
+    .dbtn.on { color: var(--amber); border-color: var(--amber); background: rgba(245,166,35,.08); font-weight: 700; }
+    .dbtn:hover:not(.on) { background: var(--bg-2); color: var(--text-1); }
     .note {
       padding: 6px 10px;
       border-top: 1px solid var(--border);
@@ -116,12 +153,20 @@ export interface PaletteItem {
 })
 export class PaletteComponent {
   @Input()  selectedId: string | null = null;
-  @Output() itemSelect = new EventEmitter<PaletteItem | null>();
+  @Output() itemSelect   = new EventEmitter<PaletteItem | null>();
+  @Output() facingChange = new EventEmitter<Direction>();
 
   readonly lib = COMPONENT_LIBRARY;
+  readonly directions: Direction[] = ['North', 'East', 'South', 'West'];
+  selectedFacing: Direction = 'North';
 
   select(it: PaletteItem): void {
     const next = this.selectedId === it.id ? null : it;
     this.itemSelect.emit(next);
+  }
+
+  setFacing(d: Direction): void {
+    this.selectedFacing = d;
+    this.facingChange.emit(d);
   }
 }
