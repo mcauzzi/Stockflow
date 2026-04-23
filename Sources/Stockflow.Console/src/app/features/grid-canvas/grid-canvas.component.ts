@@ -44,6 +44,13 @@ const FLOORS = [
         <div class="ovl-info dim2">{{ componentCount }} components · {{ entityCount }} entities</div>
       </div>
 
+      <!-- Active tool banner -->
+      <div class="ovl tool-banner" *ngIf="activeTool">
+        <span class="tool-sym" [style.color]="toolColor">{{ toolSym }}</span>
+        PLACING <span [style.color]="toolColor">{{ toolLabel }}</span>
+        &nbsp;· Click cell to place &nbsp; <span class="esc-hint">ESC to cancel</span>
+      </div>
+
       <!-- Overlay toggles (bottom-left) -->
       <div class="ovl bl">
         <button class="tog" [class.on]="showEntities" (click)="showEntities = !showEntities">
@@ -69,7 +76,8 @@ const FLOORS = [
       <svg #svgEl
            [attr.viewBox]="viewBox"
            preserveAspectRatio="none"
-           style="flex:1;width:100%;cursor:crosshair;display:block"
+           [style.cursor]="activeTool ? 'cell' : 'crosshair'"
+           style="flex:1;width:100%;display:block"
            (mousemove)="onMouseMove($event)"
            (mouseleave)="hover = null"
            (click)="onGridClick()">
@@ -118,6 +126,32 @@ const FLOORS = [
               </g>
             </ng-container>
 
+            <!-- Package Generator: green square with direction arrow -->
+            <ng-container *ngSwitchCase="'package_generator'">
+              <rect x="1" y="1" [attr.width]="CELL-2" [attr.height]="CELL-2"
+                    fill="#0f2018"
+                    [attr.stroke]="c.id === selectedId ? '#f5a623' : '#1e4a2e'"
+                    [attr.stroke-width]="c.id === selectedId ? 1.5 : 1"/>
+              <g [attr.transform]="'rotate('+facingRot(c.facing)+' '+CELL/2+' '+CELL/2+')'">
+                <line x1="5" [attr.y1]="CELL/2" [attr.x2]="CELL-7" [attr.y2]="CELL/2" stroke="#4ade80" stroke-width="1.5"/>
+                <polygon [attr.points]="arrowPtsGen()" fill="#4ade80"/>
+              </g>
+              <text [attr.x]="CELL/2" [attr.y]="CELL-5"
+                    font-size="5" fill="#4ade80" font-family="JetBrains Mono,monospace"
+                    text-anchor="middle" opacity="0.8">GEN</text>
+            </ng-container>
+
+            <!-- Package Exit: coral square with EXIT label -->
+            <ng-container *ngSwitchCase="'package_exit'">
+              <rect x="1" y="1" [attr.width]="CELL-2" [attr.height]="CELL-2"
+                    fill="#1e0e0e"
+                    [attr.stroke]="c.id === selectedId ? '#f5a623' : '#4a1e1e'"
+                    [attr.stroke-width]="c.id === selectedId ? 1.5 : 1"/>
+              <text [attr.x]="CELL/2" [attr.y]="CELL/2+3"
+                    font-size="6" fill="#f87171" font-family="JetBrains Mono,monospace"
+                    text-anchor="middle" letter-spacing="0.03em">EXIT</text>
+            </ng-container>
+
             <ng-container *ngSwitchDefault>
               <rect x="1" y="1" [attr.width]="CELL-2" [attr.height]="CELL-2"
                     fill="#181d24"
@@ -141,11 +175,20 @@ const FLOORS = [
                 stroke="#0c0f12" stroke-width="0.5"/>
         </g>
 
-        <!-- Hover highlight -->
-        <rect *ngIf="hover"
+        <!-- Hover highlight / placement preview -->
+        <rect *ngIf="hover && !activeTool"
               [attr.x]="hover.x*CELL" [attr.y]="hover.y*CELL"
               [attr.width]="CELL" [attr.height]="CELL"
               fill="rgba(245,166,35,.07)" stroke="#f5a623" stroke-width="0.5"
+              pointer-events="none"/>
+
+        <rect *ngIf="hover && activeTool"
+              [attr.x]="hover.x*CELL" [attr.y]="hover.y*CELL"
+              [attr.width]="CELL" [attr.height]="CELL"
+              [attr.fill]="toolPreviewFill"
+              [attr.stroke]="toolColor"
+              stroke-width="1.5"
+              stroke-dasharray="3 2"
               pointer-events="none"/>
 
         <!-- Column labels -->
@@ -181,6 +224,17 @@ const FLOORS = [
     .tr { top: 8px; right: 8px; text-align: right; }
     .bl { bottom: 8px; left: 8px; display: flex; flex-direction: column; gap: 3px; padding: 5px 8px; }
     .br { bottom: 8px; right: 8px; padding: 6px 8px; }
+    .tool-banner {
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      padding: 8px 16px;
+      font-size: 10px;
+      letter-spacing: .06em;
+      white-space: nowrap;
+    }
+    .tool-sym { font-size: 14px; margin-right: 4px; }
+    .esc-hint { color: var(--text-4); }
     .ovl-info { font-size: 9px; margin-bottom: 2px; white-space: nowrap; }
     .floor-btns { display: flex; gap: 0; margin-top: 5px; }
     .fbtn {
@@ -217,12 +271,14 @@ const FLOORS = [
   `],
 })
 export class GridCanvasComponent implements OnChanges {
-  @Input() components = new Map<number, ComponentState>();
-  @Input() entities   = new Map<number, EntityState>();
+  @Input() components  = new Map<number, ComponentState>();
+  @Input() entities    = new Map<number, EntityState>();
   @Input() selectedId: number | null = null;
   @Input() cols = 50;
   @Input() rows = 50;
+  @Input() activeTool: { id: string; kind: string; name: string; sym: string } | null = null;
   @Output() componentSelect = new EventEmitter<ComponentState | null>();
+  @Output() cellClick       = new EventEmitter<{ x: number; y: number }>();
 
   @ViewChild('svgEl') svgEl!: ElementRef<SVGSVGElement>;
 
@@ -240,6 +296,23 @@ export class GridCanvasComponent implements OnChanges {
   get viewBox() { return `0 0 ${this.svgW} ${this.svgH}`; }
   get componentCount() { return this.components.size; }
   get entityCount()    { return this.entities.size; }
+
+  get toolColor(): string {
+    if (!this.activeTool) return '#f5a623';
+    return this.activeTool.kind === 'package_generator' ? '#4ade80'
+         : this.activeTool.kind === 'package_exit'      ? '#f87171'
+         : '#f5a623';
+  }
+
+  get toolPreviewFill(): string {
+    if (!this.activeTool) return 'rgba(245,166,35,.07)';
+    return this.activeTool.kind === 'package_generator' ? 'rgba(74,222,128,.15)'
+         : this.activeTool.kind === 'package_exit'      ? 'rgba(248,113,113,.15)'
+         : 'rgba(245,166,35,.07)';
+  }
+
+  get toolLabel(): string { return this.activeTool?.name.toUpperCase() ?? ''; }
+  get toolSym(): string   { return this.activeTool?.sym ?? ''; }
 
   visibleComponents: ComponentState[] = [];
   visibleEntities:   EntityState[]    = [];
@@ -266,8 +339,17 @@ export class GridCanvasComponent implements OnChanges {
       ? { x: cx, y: cy } : null;
   }
 
-  onGridClick(): void { this.componentSelect.emit(null); }
-  selectComponent(c: ComponentState): void { this.componentSelect.emit(c); }
+  onGridClick(): void {
+    if (this.activeTool && this.hover) {
+      this.cellClick.emit({ x: this.hover.x, y: this.hover.y });
+    } else {
+      this.componentSelect.emit(null);
+    }
+  }
+
+  selectComponent(c: ComponentState): void {
+    if (!this.activeTool) this.componentSelect.emit(c);
+  }
 
   facingRot(f: Direction): number {
     return { East: 0, South: 90, West: 180, North: 270 }[f] ?? 0;
@@ -283,9 +365,16 @@ export class GridCanvasComponent implements OnChanges {
     return `${x-4},${y-3} ${x},${y} ${x-4},${y+3}`;
   }
 
+  arrowPtsGen(): string {
+    const x2 = CELL - 6, y = CELL / 2;
+    return `${x2-5},${y-3.5} ${x2},${y} ${x2-5},${y+3.5}`;
+  }
+
   kindColor(kind: string): string {
-    return kind === 'conveyor_oneway' ? '#4ade80'
-         : kind === 'conveyor_turn'   ? '#22d3ee'
+    return kind === 'conveyor_oneway'   ? '#4ade80'
+         : kind === 'conveyor_turn'     ? '#22d3ee'
+         : kind === 'package_generator' ? '#86efac'
+         : kind === 'package_exit'      ? '#fca5a5'
          : '#3d4652';
   }
 

@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { WebSocketService } from './websocket.service';
 import {
-  ComponentState, EntityState, MetricsSnapshot, SimEvent, SimSpeed,
+  ComponentState, Direction, EntityState, MetricsSnapshot, SimEvent, SimSpeed,
   StateDeltaMessage, FullStateMessage,
 } from '../models/protocol';
 import { MockEvent, INITIAL_EVENTS, genSpark } from '../mock/sim-mock';
@@ -75,6 +75,24 @@ export class SimStateService implements OnDestroy {
     });
   }
 
+  placeComponent(
+    kind: string, gridX: number, gridY: number, facing: Direction,
+    params?: Partial<{ spawnRate: number; sku: string; weight: number; size: number }>,
+  ): void {
+    const body = { kind, gridX, gridY, facing, ...params };
+    this.http.post(`${REST_BASE}/api/components`, body).subscribe({
+      next: () => this._appendEvent('i', 'REST', `Placed ${kind} at (${gridX},${gridY})`),
+      error: (err: any) => this._appendEvent('e', 'REST', `Place failed: ${err.status}`),
+    });
+  }
+
+  configureComponent(id: number, props: Record<string, string>): void {
+    this.http.put(`${REST_BASE}/api/components/${id}`, props).subscribe({
+      next: () => this._appendEvent('i', 'REST', `Configured component #${id}`),
+      error: (err: any) => this._appendEvent('e', 'REST', `Configure failed: ${err.status}`),
+    });
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
 
   private _init(): void {
@@ -123,6 +141,7 @@ export class SimStateService implements OnDestroy {
             id: c.id, kind: c.kind,
             gridX: c.gridX, gridY: c.gridY,
             facing: c.facing,
+            properties: c.properties,
           });
         }
         this.components.set(map);

@@ -159,6 +159,9 @@ export class WebSocketService implements OnDestroy {
     gridX:  (p[2] as number) ?? 0,
     gridY:  (p[3] as number) ?? 0,
     facing: (['North','East','South','West'][(p[4] as number) ?? 1] ?? 'East') as Direction,
+    properties: p[5] instanceof Map
+      ? Object.fromEntries(p[5] as Map<string, string>)
+      : p[5] ? p[5] as Record<string, string> : undefined,
   });
 
   private _parseEvent = (p: unknown[]): SimEvent => ({
