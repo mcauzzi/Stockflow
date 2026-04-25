@@ -55,6 +55,15 @@ export interface PaletteItem {
         </div>
       </div>
 
+      <!-- Turn side selector (shown only for conveyor_turn) -->
+      <div class="facing" *ngIf="isConveyorTurn">
+        <div class="facing-lbl">TURN SIDE</div>
+        <div class="facing-btns">
+          <button class="dbtn" [class.on]="selectedTurnSide === 'Left'"  title="Left turn"  (click)="setTurnSide('Left')">L</button>
+          <button class="dbtn" [class.on]="selectedTurnSide === 'Right'" title="Right turn" (click)="setTurnSide('Right')">R</button>
+        </div>
+      </div>
+
       <div class="note">
         <span class="dim2">✕ = backend not yet implemented</span>
       </div>
@@ -153,12 +162,27 @@ export interface PaletteItem {
 })
 export class PaletteComponent {
   @Input()  selectedId: string | null = null;
-  @Output() itemSelect   = new EventEmitter<PaletteItem | null>();
-  @Output() facingChange = new EventEmitter<Direction>();
+  @Output() itemSelect    = new EventEmitter<PaletteItem | null>();
+  @Output() facingChange  = new EventEmitter<Direction>();
+  @Output() turnSideChange = new EventEmitter<'Left' | 'Right'>();
 
   readonly lib = COMPONENT_LIBRARY;
   readonly directions: Direction[] = ['North', 'East', 'South', 'West'];
   selectedFacing: Direction = 'North';
+  selectedTurnSide: 'Left' | 'Right' = 'Right';
+
+  get selectedItem(): PaletteItem | null {
+    if (!this.selectedId) return null;
+    for (const g of this.lib) {
+      const item = g.items.find(it => it.id === this.selectedId);
+      if (item) return item;
+    }
+    return null;
+  }
+
+  get isConveyorTurn(): boolean {
+    return this.selectedItem?.kind === 'conveyor_turn';
+  }
 
   select(it: PaletteItem): void {
     const next = this.selectedId === it.id ? null : it;
@@ -168,5 +192,10 @@ export class PaletteComponent {
   setFacing(d: Direction): void {
     this.selectedFacing = d;
     this.facingChange.emit(d);
+  }
+
+  setTurnSide(side: 'Left' | 'Right'): void {
+    this.selectedTurnSide = side;
+    this.turnSideChange.emit(side);
   }
 }

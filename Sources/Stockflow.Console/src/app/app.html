@@ -23,7 +23,8 @@
   <app-palette
     [selectedId]="selectedTool()?.id ?? null"
     (itemSelect)="onToolSelect($event)"
-    (facingChange)="onFacingChange($event)">
+    (facingChange)="onFacingChange($event)"
+    (turnSideChange)="onTurnSideChange($event)">
   </app-palette>
 
   <app-grid-canvas
