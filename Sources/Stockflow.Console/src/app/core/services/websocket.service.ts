@@ -1,30 +1,12 @@
 import { Injectable, NgZone, OnDestroy } from '@angular/core';
 import { Subject } from 'rxjs';
 import { decode, ExtensionCodec } from '@msgpack/msgpack';
-import * as lz4 from 'lz4js';
 import {
   ServerMessage, StateDeltaMessage, FullStateMessage, CommandResultMessage,
   EntityState, ComponentState, SimEvent, MetricsSnapshot, Direction, EntityStatus,
 } from '../models/protocol';
 
-// MessagePack-CSharp Lz4Block extension type code (hard-coded in their source)
-const LZ4_EXT_TYPE = 99;
-
-// Codec that transparently decompresses LZ4-wrapped MessagePack payloads
-const extensionCodec = new ExtensionCodec();
-extensionCodec.register({
-  type: LZ4_EXT_TYPE,
-  encode: () => null,
-  decode(data: Uint8Array): unknown {
-    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-    const originalSize = view.getInt32(0, false); // big-endian int32
-    const compressed = new Uint8Array(data.buffer, data.byteOffset + 4, data.byteLength - 4);
-    const decompressed = lz4.decompress(compressed, originalSize);
-    return decode(decompressed, { extensionCodec });
-  },
-});
-
-const WS_URL  = 'ws://localhost:9600/ws';
+const WS_URL = 'ws://localhost:9600/ws';
 
 @Injectable({ providedIn: 'root' })
 export class WebSocketService implements OnDestroy {
@@ -37,10 +19,13 @@ export class WebSocketService implements OnDestroy {
 
   constructor(private zone: NgZone) {}
 
+  // Ripulito dal caricamento inutile
   connect(): void {
     if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) return;
     this._open();
   }
+  
+  // ... resto del tuo codice originale invariato ...
 
   disconnect(): void {
     this.destroyed = true;
@@ -85,8 +70,8 @@ export class WebSocketService implements OnDestroy {
 
   private _decode(bytes: Uint8Array): ServerMessage | null {
     try {
-      const raw = decode(bytes, { extensionCodec }) as unknown[];
-      return this._parseUnion(raw);
+      const raw = decode(bytes) as unknown[];
+        return this._parseUnion(raw);
     } catch (e) {
       console.warn('[WS] MessagePack decode failed:', e);
       return null;
