@@ -80,14 +80,14 @@ export class SimStateService implements OnDestroy {
     params?: Partial<{ spawnRate: number; sku: string; weight: number; size: number }>,
   ): void {
     const body = { kind, gridX, gridY, facing, ...params };
-    this.http.post(`${REST_BASE}/api/components`, body).subscribe({
+    this.http.post(`${REST_BASE}/api/sim/components`, body).subscribe({
       next: () => this._appendEvent('i', 'REST', `Placed ${kind} at (${gridX},${gridY})`),
       error: (err: any) => this._appendEvent('e', 'REST', `Place failed: ${err.status}`),
     });
   }
 
   configureComponent(id: number, props: Record<string, string>): void {
-    this.http.put(`${REST_BASE}/api/components/${id}`, props).subscribe({
+    this.http.put(`${REST_BASE}/api/sim/components/${id}`, props).subscribe({
       next: () => this._appendEvent('i', 'REST', `Configured component #${id}`),
       error: (err: any) => this._appendEvent('e', 'REST', `Configure failed: ${err.status}`),
     });
