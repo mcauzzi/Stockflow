@@ -117,8 +117,26 @@ const KIND_LABELS: Record<string, string> = {
           </div>
         </ng-container>
 
+        <!-- ── CONVEYORS ─────────────────────────────────── -->
+        <ng-container *ngIf="isConveyor">
+          <div class="panel-head"><span>CONFIG</span></div>
+          <div class="sec form-sec">
+            <div class="field">
+              <label class="field-lbl">Speed <span class="unit">cell/s</span></label>
+              <input class="field-input" type="number" [(ngModel)]="editSpeed"
+                     min="0.1" max="10" step="0.1"/>
+            </div>
+            <button class="save-btn" (click)="saveConveyor()">APPLY CHANGES</button>
+          </div>
+          <div class="panel-head"><span>PROPERTIES</span></div>
+          <div class="sec">
+            <div class="row"><div class="k">Grid</div><div class="v">({{ selected.gridX }}, {{ selected.gridY }})</div></div>
+            <div class="row"><div class="k">Facing</div><div class="v">{{ selected.facing }}</div></div>
+          </div>
+        </ng-container>
+
         <!-- ── OTHER COMPONENTS ──────────────────────────── -->
-        <ng-container *ngIf="!isGenerator && !isExit">
+        <ng-container *ngIf="!isGenerator && !isExit && !isConveyor">
           <div class="panel-head"><span>PROPERTIES</span></div>
           <div class="sec">
             <div class="row"><div class="k">Kind</div><div class="v">{{ selected.kind }}</div></div>
@@ -126,6 +144,11 @@ const KIND_LABELS: Record<string, string> = {
             <div class="row"><div class="k">Facing</div><div class="v">{{ selected.facing }}</div></div>
           </div>
         </ng-container>
+
+        <!-- ── DELETE ────────────────────────────────────── -->
+        <div class="sec">
+          <button class="del-btn" (click)="deleteComponent()">DELETE COMPONENT</button>
+        </div>
       </ng-container>
 
     </div>
@@ -216,6 +239,19 @@ const KIND_LABELS: Record<string, string> = {
       transition: all .12s;
     }
     .save-btn:hover { background: rgba(34,211,238,.14); }
+    .del-btn {
+      padding: 6px;
+      border: 1px solid rgba(248,113,113,.4);
+      background: rgba(248,113,113,.06);
+      color: #f87171;
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .08em;
+      cursor: pointer;
+      width: 100%;
+      transition: all .12s;
+    }
+    .del-btn:hover { background: rgba(248,113,113,.16); }
 
     /* Exit metrics */
     .metrics-sec { display: flex; flex-direction: column; gap: 6px; }
@@ -248,6 +284,7 @@ export class InspectorComponent implements OnChanges {
   editSpawnRate = 1;
   editSku = 'PKG';
   editEnabled = true;
+  editSpeed = 1;
 
   get kindLabel(): string {
     return this.selected ? (KIND_LABELS[this.selected.kind] ?? this.selected.kind.toUpperCase()) : '';
@@ -255,13 +292,19 @@ export class InspectorComponent implements OnChanges {
 
   get isGenerator(): boolean { return this.selected?.kind === 'package_generator'; }
   get isExit():      boolean { return this.selected?.kind === 'package_exit'; }
+  get isConveyor():  boolean {
+    return this.selected?.kind === 'conveyor_oneway' || this.selected?.kind === 'conveyor_turn';
+  }
 
   ngOnChanges(): void {
+    const p = this.selected?.properties ?? {};
     if (this.selected?.kind === 'package_generator') {
-      const p = this.selected.properties ?? {};
       this.editSpawnRate = parseFloat(p['spawnRate'] ?? '1');
       this.editSku       = p['sku'] ?? 'PKG';
       this.editEnabled   = (p['enabled'] ?? 'true') !== 'false';
+    }
+    if (this.isConveyor) {
+      this.editSpeed = parseFloat(p['speed'] ?? '1');
     }
   }
 
@@ -276,5 +319,15 @@ export class InspectorComponent implements OnChanges {
       sku:       this.editSku,
       enabled:   this.editEnabled ? 'true' : 'false',
     });
+  }
+
+  saveConveyor(): void {
+    if (!this.selected) return;
+    this.sim.configureComponent(this.selected.id, { speed: String(this.editSpeed) });
+  }
+
+  deleteComponent(): void {
+    if (!this.selected) return;
+    this.sim.removeComponent(this.selected.id);
   }
 }

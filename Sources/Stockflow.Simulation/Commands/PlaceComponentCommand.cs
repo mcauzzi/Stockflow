@@ -29,3 +29,5 @@ public sealed record PlaceConveyorTurnCommand(
     TurnSide  Turn  = TurnSide.Right,
     float     Speed = 1f
 ) : ICommand;
+
+public sealed record RemoveComponentCommand(int ComponentId) : ICommand;

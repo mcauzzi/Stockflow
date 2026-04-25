@@ -16,7 +16,7 @@ public class OneWayConveyor : ISimComponent
     private Port                            InPort   { get; }
     private Port                            OutPort  { get; }
     public  IReadOnlyList<Port>             Ports    { get; }
-    public  float                           Speed    { get; }
+    public  float                           Speed    { get; set; }
     public  RoutingGraph                    Graph    { get; }
 
     public OneWayConveyor(int          id,    GridCoord position, Direction facing, float speed,

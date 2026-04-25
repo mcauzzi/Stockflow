@@ -64,6 +64,15 @@ export interface PaletteItem {
         </div>
       </div>
 
+      <!-- Speed input (shown for conveyors) -->
+      <div class="facing" *ngIf="isConveyor">
+        <div class="facing-lbl">SPEED <span class="dim2">cell/s</span></div>
+        <input class="speed-input" type="number"
+               [value]="selectedSpeed"
+               (change)="setSpeed(+$any($event.target).value)"
+               min="0.1" max="10" step="0.1"/>
+      </div>
+
       <div class="note">
         <span class="dim2">✕ = backend not yet implemented</span>
       </div>
@@ -152,6 +161,18 @@ export interface PaletteItem {
     }
     .dbtn.on { color: var(--amber); border-color: var(--amber); background: rgba(245,166,35,.08); font-weight: 700; }
     .dbtn:hover:not(.on) { background: var(--bg-2); color: var(--text-1); }
+    .speed-input {
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--bg-0);
+      border: 1px solid var(--border-bright);
+      color: var(--text-1);
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 4px 6px;
+      outline: none;
+    }
+    .speed-input:focus { border-color: var(--cyan); }
     .note {
       padding: 6px 10px;
       border-top: 1px solid var(--border);
@@ -165,11 +186,13 @@ export class PaletteComponent {
   @Output() itemSelect    = new EventEmitter<PaletteItem | null>();
   @Output() facingChange  = new EventEmitter<Direction>();
   @Output() turnSideChange = new EventEmitter<'Left' | 'Right'>();
+  @Output() speedChange   = new EventEmitter<number>();
 
   readonly lib = COMPONENT_LIBRARY;
   readonly directions: Direction[] = ['North', 'East', 'South', 'West'];
   selectedFacing: Direction = 'North';
   selectedTurnSide: 'Left' | 'Right' = 'Right';
+  selectedSpeed = 1;
 
   get selectedItem(): PaletteItem | null {
     if (!this.selectedId) return null;
@@ -182,6 +205,11 @@ export class PaletteComponent {
 
   get isConveyorTurn(): boolean {
     return this.selectedItem?.kind === 'conveyor_turn';
+  }
+
+  get isConveyor(): boolean {
+    const kind = this.selectedItem?.kind;
+    return kind === 'conveyor_oneway' || kind === 'conveyor_turn';
   }
 
   select(it: PaletteItem): void {
@@ -197,5 +225,10 @@ export class PaletteComponent {
   setTurnSide(side: 'Left' | 'Right'): void {
     this.selectedTurnSide = side;
     this.turnSideChange.emit(side);
+  }
+
+  setSpeed(value: number): void {
+    this.selectedSpeed = Math.max(0.1, Math.min(10, value));
+    this.speedChange.emit(this.selectedSpeed);
   }
 }
