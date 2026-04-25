@@ -59,7 +59,13 @@ public sealed class SimulationController(
                 occupant   = c.Occupant?.Id,
                 properties = BuildProperties(c),
             }),
-            entityCount = entities.Count,
+            entities = entities.Values.Select(e => new
+            {
+                id          = e.Id,
+                sku         = e.Sku,
+                componentId = e.CurrentComponent?.Id,
+                progress    = e.Progress,
+            }),
         });
     }
 
@@ -120,7 +126,9 @@ public sealed class SimulationController(
                 req.Sku       ?? "PKG",
                 req.Weight    ?? 1f,
                 req.Size      ?? 1f),
-            "package_exit" => new PlacePackageExitCommand(pos, dir),
+            "package_exit"    => new PlacePackageExitCommand(pos, dir),
+            "conveyor_oneway" => new PlaceOneWayConveyorCommand(pos, dir),
+            "conveyor_turn"   => new PlaceConveyorTurnCommand(pos, dir),
             _ => null,
         };
 
