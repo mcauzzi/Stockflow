@@ -4,11 +4,13 @@ namespace Stockflow.Simulation.Component;
 
 public static class DirectionExtensions
 {
+    // Screen-space convention: Y increases downward (SVG/grid canvas).
+    // North = up on screen (Y-1), South = down on screen (Y+1).
     public static GridCoord ToOffset(this Direction dir) => dir switch
                                                             {
-                                                                Direction.North => new(0, 1),
-                                                                Direction.East  => new(1, 0),
-                                                                Direction.South => new(0, -1),
+                                                                Direction.North => new(0, -1),
+                                                                Direction.East  => new(1,  0),
+                                                                Direction.South => new(0,  1),
                                                                 Direction.West  => new(-1, 0),
                                                                 _ => throw new ArgumentOutOfRangeException(nameof(dir))
                                                             };

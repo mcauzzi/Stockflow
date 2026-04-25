@@ -77,11 +77,15 @@ export class SimStateService implements OnDestroy {
 
   placeComponent(
     kind: string, gridX: number, gridY: number, facing: Direction,
-    params?: Partial<{ spawnRate: number; sku: string; weight: number; size: number }>,
+    params?: Partial<{ spawnRate: number; sku: string; weight: number; size: number; turn: string }>,
   ): void {
     const body = { kind, gridX, gridY, facing, ...params };
     this.http.post(`${REST_BASE}/api/sim/components`, body).subscribe({
-      next: () => this._appendEvent('i', 'REST', `Placed ${kind} at (${gridX},${gridY})`),
+      next: () => {
+        this._appendEvent('i', 'REST', `Placed ${kind} at (${gridX},${gridY})`);
+        // Reload full state after 150ms (command applied within ~100ms at 10Hz)
+        setTimeout(() => this._loadInitialState(), 150);
+      },
       error: (err: any) => this._appendEvent('e', 'REST', `Place failed: ${err.status}`),
     });
   }
@@ -146,7 +150,7 @@ export class SimStateService implements OnDestroy {
         }
         this.components.set(map);
 
-        this._appendEvent('i', 'REST', `Loaded ${map.size} components, ${s.entityCount} entities`);
+        this._appendEvent('i', 'REST', `Loaded ${map.size} components, ${(s.entities?.length ?? 0)} entities`);
       },
       error: err => this._appendEvent('w', 'REST', `State load failed: ${err.status}`),
     });

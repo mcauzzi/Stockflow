@@ -165,11 +165,12 @@ public class SimulationEngineCommandTests
     [Fact]
     public void PlaceAdjacentGeneratorAndExit_AutoConnectsRouting()
     {
-        // Generator at (1,1) facing North → OutPort.Position = (1,2)
-        // Exit      at (1,2) facing North → InPort.Position  = (1,1)
+        // Screen convention: North = Y-1.
+        // Generator at (1,1) facing North → OutPort.Position = (1,0)
+        // Exit      at (1,0) facing North → InPort.Position  = (1,1)
         var engine = MakeEngine();
         engine.ProcessCommand(new PlacePackageGeneratorCommand(new GridCoord(1, 1), Direction.North));
-        engine.ProcessCommand(new PlacePackageExitCommand(new GridCoord(1, 2), Direction.North));
+        engine.ProcessCommand(new PlacePackageExitCommand(new GridCoord(1, 0), Direction.North));
 
         var gen  = (PackageGenerator)engine.State.Components[0];
         var exit = (PackageExit)engine.State.Components[1];
@@ -200,7 +201,7 @@ public class SimulationEngineCommandTests
         var engine = MakeEngine();
         engine.ProcessCommand(new PlacePackageGeneratorCommand(
             new GridCoord(1, 1), Direction.North, SpawnRate: 1f));
-        engine.ProcessCommand(new PlacePackageExitCommand(new GridCoord(1, 2), Direction.North));
+        engine.ProcessCommand(new PlacePackageExitCommand(new GridCoord(1, 0), Direction.North));
 
         var exit = (PackageExit)engine.State.Components[1];
 

@@ -46,9 +46,11 @@ public class ConveyorTurnTests
     [Fact]
     public void FourTurns_ClockwiseLoop_EntityCirculatesAndReturnsToStart()
     {
-        //  CT1(0,1) →East→ CT2(1,1)
+        // Screen convention: North = Y-1 (up), South = Y+1 (down).
+        //
+        //  CT1(0,0) →East→ CT2(1,0)
         //     ↑                 ↓
-        //  CT4(0,0) ←West← CT3(1,0)
+        //  CT4(0,1) ←West← CT3(1,1)
         //
         // With Speed=1 and deltaTime=1, each tick advances Progress by 1.
         // Components are ticked left-to-right: when CT1 transfers to CT2 in round N,
@@ -59,10 +61,10 @@ public class ConveyorTurnTests
 
         var graph = new RoutingGraph();
 
-        var ct1 = new ConveyorTurn(1, new GridCoord(0, 1), Direction.North, TurnSide.Right, 1f, graph);
-        var ct2 = new ConveyorTurn(2, new GridCoord(1, 1), Direction.East,  TurnSide.Right, 1f, graph);
-        var ct3 = new ConveyorTurn(3, new GridCoord(1, 0), Direction.South, TurnSide.Right, 1f, graph);
-        var ct4 = new ConveyorTurn(4, new GridCoord(0, 0), Direction.West,  TurnSide.Right, 1f, graph);
+        var ct1 = new ConveyorTurn(1, new GridCoord(0, 0), Direction.North, TurnSide.Right, 1f, graph);
+        var ct2 = new ConveyorTurn(2, new GridCoord(1, 0), Direction.East,  TurnSide.Right, 1f, graph);
+        var ct3 = new ConveyorTurn(3, new GridCoord(1, 1), Direction.South, TurnSide.Right, 1f, graph);
+        var ct4 = new ConveyorTurn(4, new GridCoord(0, 1), Direction.West,  TurnSide.Right, 1f, graph);
 
         var outPort = new PortId(1);
         var inPort  = new PortId(0);

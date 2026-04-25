@@ -144,8 +144,8 @@ public sealed class SimulationHostedService : BackgroundService
             ServerTime          = ServerTime,
             SimulationTime      = delta.SimulationTime,
             TimeScale           = _engine.TimeScale,
-            CreatedEntities     = [..delta.AddedEntityStates.Select(ToProtoEntity)],
-            UpdatedEntities     = [..delta.UpdatedEntityStates.Select(ToProtoEntity)],
+            CreatedEntities     = [..delta.AddedEntityStates.Select(s => ToProtoEntity(s, byId))],
+            UpdatedEntities     = [..delta.UpdatedEntityStates.Select(s => ToProtoEntity(s, byId))],
             RemovedEntityIds    = [..delta.RemovedEntityIds],
             CreatedComponents   = [..delta.AddedComponentIds
                 .Where(byId.ContainsKey)
@@ -155,15 +155,19 @@ public sealed class SimulationHostedService : BackgroundService
         };
     }
 
-    private FullStateMessage BuildFullStateMessage() => new()
+    private FullStateMessage BuildFullStateMessage()
     {
-        ServerTime     = ServerTime,
-        SimulationTime = _engine.SimulationTime,
-        TimeScale      = _engine.TimeScale,
-        Components     = [.._engine.State.Components.Select(ToProtoComponent)],
-        Entities       = [.._engine.State.Entities.Active.Values
-            .Select(e => ToProtoEntity(SimEntityState.From(e)))],
-    };
+        var byId = _engine.State.Components.ToDictionary(c => c.Id);
+        return new()
+        {
+            ServerTime     = ServerTime,
+            SimulationTime = _engine.SimulationTime,
+            TimeScale      = _engine.TimeScale,
+            Components     = [.._engine.State.Components.Select(ToProtoComponent)],
+            Entities       = [.._engine.State.Entities.Active.Values
+                .Select(e => ToProtoEntity(SimEntityState.From(e), byId))],
+        };
+    }
 
     private CommandResultMessage Ack(int commandId) => new()
     {
@@ -182,13 +186,27 @@ public sealed class SimulationHostedService : BackgroundService
 
     private float ServerTime => (float)_wallClock.Elapsed.TotalSeconds;
 
-    private static Protocol.Messages.EntityState ToProtoEntity(SimEntityState s) => new()
+    private static Protocol.Messages.EntityState ToProtoEntity(
+        SimEntityState s, IReadOnlyDictionary<int, ISimComponent> byId)
     {
-        Id       = s.Id,
-        Sku      = s.Sku,
-        Position = Vector3.Zero, // world-space interpolation: future milestone
-        Status   = (ProtoEntityStatus)(int)s.Status,
-    };
+        Vector3 pos = Vector3.Zero;
+        if (byId.TryGetValue(s.CurrentComponentId, out var comp))
+        {
+            // Interpolate 2D grid position: entity moves from cell entry to exit along facing direction.
+            var off = comp.Facing.ToOffset();
+            pos = new Vector3(
+                comp.Position.X + off.X * s.Progress,
+                comp.Position.Y + off.Y * s.Progress,
+                0f);
+        }
+        return new()
+        {
+            Id       = s.Id,
+            Sku      = s.Sku,
+            Position = pos,
+            Status   = (ProtoEntityStatus)(int)s.Status,
+        };
+    }
 
     private static ComponentState ToProtoComponent(ISimComponent c) => new()
     {
@@ -218,12 +236,18 @@ public sealed class SimulationHostedService : BackgroundService
                 ["throughput"]         = exit.Throughput.ToString("F3"),
                 ["avgFulfillmentTime"] = exit.AvgFulfillmentTime.ToString("F3"),
             };
+        if (c is ConveyorTurn turn)
+            return new()
+            {
+                ["turn"] = turn.Turn == TurnSide.Right ? "right" : "left",
+            };
         return null;
     }
 
     private static string KindString(SimComponentType type) => type switch
     {
         SimComponentType.OneWayConveyor   => ComponentKinds.OneWayConveyor,
+        SimComponentType.ConveyorTurn     => "conveyor_turn",
         SimComponentType.PackageGenerator => ComponentKinds.PackageGenerator,
         SimComponentType.PackageExit      => ComponentKinds.PackageExit,
         _                                 => type.ToString(),
