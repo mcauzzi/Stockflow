@@ -1,4 +1,4 @@
-import { Component, OnInit, HostListener, signal, computed, effect } from '@angular/core';
+import { Component, OnInit, HostListener, signal, computed, effect, Signal } from '@angular/core';
 import { NgIf } from '@angular/common';
 
 import { SimStateService } from './core/services/sim-state.service';
@@ -32,6 +32,11 @@ import { genSpark } from './core/mock/sim-mock';
 export class App implements OnInit {
   readonly activeTab      = signal<Tab>('OPERATE');
   readonly selectedComp   = signal<ComponentState | null>(null);
+  readonly liveSelected   = computed(() => {
+    const sel = this.selectedComp();
+    if (!sel) return null;
+    return this.sim.components().get(sel.id) ?? null;
+  });
   readonly selectedTool   = signal<PaletteItem | null>(null);
   readonly placeFacing    = signal<Direction>('North');
   readonly placeTurnSide  = signal<'Left' | 'Right'>('Right');
