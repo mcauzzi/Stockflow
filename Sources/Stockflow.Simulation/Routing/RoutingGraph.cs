@@ -17,6 +17,16 @@ public class RoutingGraph
         connections.Remove((component, port));
     }
 
+    public void DisconnectAll(ISimComponent component)
+    {
+        var keys = connections
+            .Where(kv => kv.Key.Item1 == component || kv.Value.To == component)
+            .Select(kv => kv.Key)
+            .ToList();
+        foreach (var key in keys)
+            connections.Remove(key);
+    }
+
     // Dato un componente e la sua porta di uscita, chi c'è dall'altra parte?
     public Connection? GetNext(ISimComponent component, PortId outPort)
     {

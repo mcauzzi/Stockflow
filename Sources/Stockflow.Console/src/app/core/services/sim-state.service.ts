@@ -77,7 +77,7 @@ export class SimStateService implements OnDestroy {
 
   placeComponent(
     kind: string, gridX: number, gridY: number, facing: Direction,
-    params?: Partial<{ spawnRate: number; sku: string; weight: number; size: number; turn: string }>,
+    params?: Partial<{ spawnRate: number; sku: string; weight: number; size: number; turn: string; speed: number }>,
   ): void {
     const body = { kind, gridX, gridY, facing, ...params };
     this.http.post(`${REST_BASE}/api/sim/components`, body).subscribe({
@@ -94,6 +94,16 @@ export class SimStateService implements OnDestroy {
     this.http.put(`${REST_BASE}/api/sim/components/${id}`, props).subscribe({
       next: () => this._appendEvent('i', 'REST', `Configured component #${id}`),
       error: (err: any) => this._appendEvent('e', 'REST', `Configure failed: ${err.status}`),
+    });
+  }
+
+  removeComponent(id: number): void {
+    this.http.delete(`${REST_BASE}/api/sim/components/${id}`).subscribe({
+      next: () => {
+        this._appendEvent('i', 'REST', `Removed component #${id}`);
+        setTimeout(() => this._loadInitialState(), 150);
+      },
+      error: (err: any) => this._appendEvent('e', 'REST', `Remove failed: ${err.status}`),
     });
   }
 

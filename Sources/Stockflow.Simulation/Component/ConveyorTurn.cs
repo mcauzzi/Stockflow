@@ -16,7 +16,7 @@ public class ConveyorTurn : ISimComponent
     private Port                            InPort   { get; }
     private Port                            OutPort  { get; }
     public  IReadOnlyList<Port>             Ports    { get; }
-    public  float                           Speed    { get; }
+    public  float                           Speed    { get; set; }
     public  TurnSide                        Turn     { get; }
     public  RoutingGraph                    Graph    { get; }
 

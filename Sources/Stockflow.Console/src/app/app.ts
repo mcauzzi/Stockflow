@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, effect } from '@angular/core';
+import { Component, OnInit, HostListener, signal, computed, effect } from '@angular/core';
 import { NgIf } from '@angular/common';
 
 import { SimStateService } from './core/services/sim-state.service';
@@ -35,6 +35,7 @@ export class App implements OnInit {
   readonly selectedTool   = signal<PaletteItem | null>(null);
   readonly placeFacing    = signal<Direction>('North');
   readonly placeTurnSide  = signal<'Left' | 'Right'>('Right');
+  readonly placeSpeed     = signal(1);
   readonly paused         = signal(false);
   readonly currentSpeed   = signal<SimSpeed>(1);
 
@@ -92,13 +93,23 @@ export class App implements OnInit {
     this.placeTurnSide.set(side);
   }
 
+  onPlaceSpeedChange(speed: number): void {
+    this.placeSpeed.set(speed);
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    this.selectedTool.set(null);
+  }
+
   onCellClick(cell: { x: number; y: number }): void {
     const tool = this.selectedTool();
     if (!tool) return;
-    const params = tool.kind === 'conveyor_turn'
-      ? { turn: this.placeTurnSide() }
-      : undefined;
-    this.sim.placeComponent(tool.kind, cell.x, cell.y, this.placeFacing(), params);
-    this.selectedTool.set(null);
+    const kind = tool.kind;
+    const params: Record<string, unknown> = {};
+    if (kind === 'conveyor_turn') params['turn'] = this.placeTurnSide();
+    if (kind === 'conveyor_oneway' || kind === 'conveyor_turn') params['speed'] = this.placeSpeed();
+    this.sim.placeComponent(kind, cell.x, cell.y, this.placeFacing(),
+      Object.keys(params).length ? params as any : undefined);
   }
 }

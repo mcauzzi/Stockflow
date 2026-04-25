@@ -239,7 +239,13 @@ public sealed class SimulationHostedService : BackgroundService
         if (c is ConveyorTurn turn)
             return new()
             {
-                ["turn"] = turn.Turn == TurnSide.Right ? "right" : "left",
+                ["turn"]  = turn.Turn == TurnSide.Right ? "right" : "left",
+                ["speed"] = turn.Speed.ToString("F3"),
+            };
+        if (c is OneWayConveyor conv)
+            return new()
+            {
+                ["speed"] = conv.Speed.ToString("F3"),
             };
         return null;
     }
