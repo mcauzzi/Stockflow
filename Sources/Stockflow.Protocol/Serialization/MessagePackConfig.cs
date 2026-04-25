@@ -51,8 +51,7 @@ public static class MessagePackConfig
                 StandardResolver.Instance);
 
             Options = MessagePackSerializerOptions.Standard
-                .WithResolver(resolver)
-                .WithCompression(MessagePackCompression.Lz4Block);
+                .WithResolver(resolver);
 
             MessagePackSerializer.DefaultOptions = Options;
             _initialized = true;
