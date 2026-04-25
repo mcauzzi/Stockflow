@@ -96,7 +96,7 @@ const FLOORS = [
         <rect [attr.width]="svgW" [attr.height]="svgH" fill="url(#dot28)"/>
 
         <!-- Components -->
-        <g *ngFor="let c of visibleComponents"
+        <g *ngFor="let c of visibleComponents; trackBy: trackById"
            [attr.transform]="'translate('+c.gridX*CELL+','+c.gridY*CELL+')'"
            style="cursor:pointer"
            (click)="selectComponent(c); $event.stopPropagation()">
@@ -370,6 +370,8 @@ export class GridCanvasComponent implements OnChanges {
     const x2 = CELL - 5, y = CELL / 2;
     return `${x2-5},${y-3} ${x2},${y} ${x2-5},${y+3}`;
   }
+
+  trackById(_: number, c: ComponentState): number { return c.id; }
 
   // Arrowhead pointing right at x=13, centered vertically — used for PackageExit input indicator
   arrowPtsExit(): string {

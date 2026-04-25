@@ -92,7 +92,10 @@ export class SimStateService implements OnDestroy {
 
   configureComponent(id: number, props: Record<string, string>): void {
     this.http.put(`${REST_BASE}/api/sim/components/${id}`, props).subscribe({
-      next: () => this._appendEvent('i', 'REST', `Configured component #${id}`),
+      next: () => {
+        this._appendEvent('i', 'REST', `Configured component #${id}`);
+        setTimeout(() => this._loadInitialState(), 150);
+      },
       error: (err: any) => this._appendEvent('e', 'REST', `Configure failed: ${err.status}`),
     });
   }
