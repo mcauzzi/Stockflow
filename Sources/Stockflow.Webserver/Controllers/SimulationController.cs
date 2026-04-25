@@ -127,8 +127,9 @@ public sealed class SimulationController(
                 req.Weight    ?? 1f,
                 req.Size      ?? 1f),
             "package_exit"    => new PlacePackageExitCommand(pos, dir),
-            "conveyor_oneway" => new PlaceOneWayConveyorCommand(pos, dir),
-            "conveyor_turn"   => new PlaceConveyorTurnCommand(pos, dir),
+            "conveyor_oneway" => new PlaceOneWayConveyorCommand(pos, dir,0.1f),
+            "conveyor_turn"   => new PlaceConveyorTurnCommand(pos, dir,
+                req.Turn == "Left" ? TurnSide.Left : TurnSide.Right),
             _ => null,
         };
 
@@ -217,6 +218,11 @@ public sealed class SimulationController(
                 ["throughput"]         = exit.Throughput.ToString("F3"),
                 ["avgFulfillmentTime"] = exit.AvgFulfillmentTime.ToString("F3"),
             };
+        if (c is ConveyorTurn turn)
+            return new()
+            {
+                ["turn"] = turn.Turn == TurnSide.Right ? "right" : "left",
+            };
         return null;
     }
 }
@@ -231,4 +237,5 @@ public sealed record PlaceComponentRequest(
     float?  SpawnRate = null,
     string? Sku       = null,
     float?  Weight    = null,
-    float?  Size      = null);
+    float?  Size      = null,
+    string? Turn      = null);

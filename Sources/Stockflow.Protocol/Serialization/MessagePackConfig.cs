@@ -52,7 +52,7 @@ public static class MessagePackConfig
 
             Options = MessagePackSerializerOptions.Standard
                 .WithResolver(resolver)
-                .WithCompression(MessagePackCompression.Lz4BlockArray);
+                .WithCompression(MessagePackCompression.Lz4Block);
 
             MessagePackSerializer.DefaultOptions = Options;
             _initialized = true;

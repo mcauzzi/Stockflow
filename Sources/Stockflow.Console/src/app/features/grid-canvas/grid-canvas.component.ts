@@ -116,13 +116,17 @@ const FLOORS = [
 
             <ng-container *ngSwitchCase="'conveyor_turn'">
               <rect x="1" y="1" [attr.width]="CELL-2" [attr.height]="CELL-2"
-                    fill="#1e2830"
-                    [attr.stroke]="c.id === selectedId ? '#f5a623' : '#2e3848'"
+                    fill="#151e2a"
+                    [attr.stroke]="c.id === selectedId ? '#f5a623' : '#2a3a4a'"
                     [attr.stroke-width]="c.id === selectedId ? 1.5 : 1"/>
               <g [attr.transform]="'rotate('+facingRot(c.facing)+' '+CELL/2+' '+CELL/2+')'">
-                <path [attr.d]="'M '+CELL/2+' '+(CELL-4)+' Q '+CELL/2+' '+CELL/2+' '+(CELL-4)+' '+CELL/2"
-                      stroke="#4a5668" stroke-width="1.2" fill="none"/>
-                <polygon [attr.points]="arrowPtsTurn()" fill="#8898aa"/>
+                <!-- Quarter-circle arc: entry from left (West), exit to bottom (South) for right turn -->
+                <!--                    entry from left (West), exit to top   (North) for left turn  -->
+                <path [attr.d]="turnArcPath(c)" stroke="#22d3ee" stroke-width="1.5" fill="none"/>
+                <!-- Exit arrowhead -->
+                <polygon [attr.points]="turnArrowPts(c)" fill="#22d3ee"/>
+                <!-- Entry dot at left-center -->
+                <circle cx="4" [attr.cy]="CELL/2" r="2" fill="#22d3ee" opacity="0.55"/>
               </g>
             </ng-container>
 
@@ -351,6 +355,8 @@ export class GridCanvasComponent implements OnChanges {
     if (!this.activeTool) this.componentSelect.emit(c);
   }
 
+  // Screen convention: North = Y-1 (up in SVG), East = X+1 (right).
+  // Base arrow points East (0°); rotate to match compass direction on screen.
   facingRot(f: Direction): number {
     return { East: 0, South: 90, West: 180, North: 270 }[f] ?? 0;
   }
@@ -360,9 +366,30 @@ export class GridCanvasComponent implements OnChanges {
     return `${x2-5},${y-3} ${x2},${y} ${x2-5},${y+3}`;
   }
 
-  arrowPtsTurn(): string {
-    const x = CELL - 4, y = CELL / 2;
-    return `${x-4},${y-3} ${x},${y} ${x-4},${y+3}`;
+  // Quarter-circle arc: radius = CELL/2 - 4 = 10 (for CELL=28)
+  // Unrotated (facing=East, rotation=0°):
+  //   entry at left-center (4, CELL/2), exit at bottom-center (CELL/2, CELL-4) → Right turn
+  //   entry at left-center (4, CELL/2), exit at top-center    (CELL/2,  4)     → Left  turn
+  turnArcPath(c: ComponentState): string {
+    const r = CELL / 2 - 4;  // radius = 10
+    const isLeft = c.properties?.['turn'] === 'left';
+    if (isLeft) {
+      // Counter-clockwise arc to top-center
+      return `M 4 ${CELL / 2} A ${r} ${r} 0 0 0 ${CELL / 2} 4`;
+    }
+    // Clockwise arc to bottom-center (default: Right)
+    return `M 4 ${CELL / 2} A ${r} ${r} 0 0 1 ${CELL / 2} ${CELL - 4}`;
+  }
+
+  turnArrowPts(c: ComponentState): string {
+    const isLeft = c.properties?.['turn'] === 'left';
+    const cx = CELL / 2;
+    if (isLeft) {
+      // Arrowhead pointing up at top-center (exit North)
+      return `${cx - 3},7 ${cx},4 ${cx + 3},7`;
+    }
+    // Arrowhead pointing down at bottom-center (exit South, default Right)
+    return `${cx - 3},${CELL - 7} ${cx},${CELL - 4} ${cx + 3},${CELL - 7}`;
   }
 
   arrowPtsGen(): string {

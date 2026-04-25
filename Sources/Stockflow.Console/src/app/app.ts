@@ -30,12 +30,13 @@ import { genSpark } from './core/mock/sim-mock';
   styleUrl: './app.scss',
 })
 export class App implements OnInit {
-  readonly activeTab    = signal<Tab>('OPERATE');
-  readonly selectedComp = signal<ComponentState | null>(null);
-  readonly selectedTool = signal<PaletteItem | null>(null);
-  readonly placeFacing  = signal<Direction>('North');
-  readonly paused       = signal(false);
-  readonly currentSpeed = signal<SimSpeed>(1);
+  readonly activeTab      = signal<Tab>('OPERATE');
+  readonly selectedComp   = signal<ComponentState | null>(null);
+  readonly selectedTool   = signal<PaletteItem | null>(null);
+  readonly placeFacing    = signal<Direction>('North');
+  readonly placeTurnSide  = signal<'Left' | 'Right'>('Right');
+  readonly paused         = signal(false);
+  readonly currentSpeed   = signal<SimSpeed>(1);
 
   // Seed sparklines with flat lines until real data arrives
   readonly sparks = signal({
@@ -87,10 +88,17 @@ export class App implements OnInit {
     this.placeFacing.set(dir);
   }
 
+  onTurnSideChange(side: 'Left' | 'Right'): void {
+    this.placeTurnSide.set(side);
+  }
+
   onCellClick(cell: { x: number; y: number }): void {
     const tool = this.selectedTool();
     if (!tool) return;
-    this.sim.placeComponent(tool.kind, cell.x, cell.y, this.placeFacing());
+    const params = tool.kind === 'conveyor_turn'
+      ? { turn: this.placeTurnSide() }
+      : undefined;
+    this.sim.placeComponent(tool.kind, cell.x, cell.y, this.placeFacing(), params);
     this.selectedTool.set(null);
   }
 }
