@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Options;
 using Stockflow.Protocol.Serialization;
 using Stockflow.Simulation.Core;
-using Stockflow.Webserver.Api;
 using Stockflow.Webserver.Configuration;
 using Stockflow.Webserver.Hosting;
 using Stockflow.Webserver.Queue;
@@ -72,6 +71,5 @@ app.MapGet("/api/health", (WebSocketHandler handler) => Results.Ok(new
 }));
 
 app.MapControllers();
-ApiEndpoints.Map(app);
 
 app.Run();

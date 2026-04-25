@@ -1,9 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using Stockflow.Protocol.Messages;
+using Stockflow.Simulation.Commands;
 using Stockflow.Simulation.Component;
 using Stockflow.Simulation.Core;
+using Stockflow.Simulation.Grid;
+using Stockflow.Webserver.Queue;
 using SimComponentType = Stockflow.Simulation.Component.ComponentType;
-using ISimComponent = Stockflow.Simulation.Component.ISimComponent;
+using ISimComponent    = Stockflow.Simulation.Component.ISimComponent;
+using SimDirection     = Stockflow.Simulation.Component.Direction;
 
 namespace Stockflow.Webserver.Controllers;
 
@@ -14,24 +18,29 @@ namespace Stockflow.Webserver.Controllers;
 ///
 /// Thread safety: <see cref="SimulationEngine.TimeScale"/> is a plain float; reading/writing
 /// it from a REST handler while the tick loop runs is safe on modern x86/ARM (aligned float
-/// writes are atomic). Grid-mutating commands are intentionally deferred to #33 where a
-/// proper lock or command-queue pattern will be introduced.
+/// writes are atomic). Grid-mutating commands are enqueued via <see cref="IRestCommandQueue"/>
+/// and applied atomically at the start of the next simulation tick.
 /// </summary>
 [ApiController]
 [Route("api/sim")]
-public sealed class SimulationController(SimulationEngine engine) : ControllerBase
+public sealed class SimulationController(
+    SimulationEngine              engine,
+    IRestCommandQueue             queue,
+    ILogger<SimulationController> logger) : ControllerBase
 {
-    // Mirrors SimulationHostedService.TimeScaleBySpeed — keep in sync until #33 extracts it.
+    // Mirrors SimulationHostedService.TimeScaleBySpeed — keep in sync until extracted to shared config.
     private static readonly float[] TimeScaleBySpeed = [0f, 1f, 2f, 5f, 10f, 1f];
 
     // ── GET /api/sim/state ────────────────────────────────────────────────────
-    // Full snapshot as JSON. Used by the Angular client for initial load and manual resyncs.
-    // Components list is snapshotted with ToList() to avoid TOCTOU with the tick loop.
     [HttpGet("state")]
     public IActionResult GetState()
     {
         var components = engine.State.Components.ToList();
         var entities   = engine.State.Entities.Active;
+
+        logger.LogDebug(
+            "GET /api/sim/state → {ComponentCount} components, {EntityCount} entities, T={SimTime:F1}s",
+            components.Count, entities.Count, engine.SimulationTime);
 
         return Ok(new
         {
@@ -55,20 +64,22 @@ public sealed class SimulationController(SimulationEngine engine) : ControllerBa
     }
 
     // ── GET /api/sim/metrics ──────────────────────────────────────────────────
-    // Basic counters derivable from engine state. Full KPI metrics (throughput, SLA, etc.)
-    // are computed by the metrics subsystem tracked in a future milestone.
     [HttpGet("metrics")]
     public IActionResult GetMetrics()
     {
         var components = engine.State.Components.ToList();
         var gridCells  = engine.Grid.Width * engine.Grid.Length;
 
+        logger.LogDebug(
+            "GET /api/sim/metrics → {ComponentCount} components, {EntityCount} entities",
+            components.Count, engine.State.Entities.Active.Count);
+
         return Ok(new
         {
-            simulationTime   = engine.SimulationTime,
-            timeScale        = engine.TimeScale,
-            entityCount      = engine.State.Entities.Active.Count,
-            componentCount   = components.Count,
+            simulationTime      = engine.SimulationTime,
+            timeScale           = engine.TimeScale,
+            entityCount         = engine.State.Entities.Active.Count,
+            componentCount      = components.Count,
             warehouseSaturation = gridCells > 0
                 ? Math.Round((double)components.Count / gridCells * 100, 1)
                 : 0.0,
@@ -76,47 +87,100 @@ public sealed class SimulationController(SimulationEngine engine) : ControllerBa
     }
 
     // ── POST /api/sim/speed ───────────────────────────────────────────────────
-    // Body: { "speed": 0‥5 }   (SimSpeed ordinal: 0=Paused 1=Normal 2=Fast 3=Faster 4=UltraFast 5=Live)
     [HttpPost("speed")]
     public IActionResult ChangeSpeed([FromBody] ChangeSpeedRequest req)
     {
         if (req.Speed is < 0 or > 5)
+        {
+            logger.LogWarning("POST /api/sim/speed → 400 invalid speed={Speed}", req.Speed);
             return BadRequest(new { success = false, errorMessage = "speed must be 0‥5" });
+        }
 
+        var previous = engine.TimeScale;
         engine.TimeScale = TimeScaleBySpeed[req.Speed];
+
+        logger.LogInformation(
+            "POST /api/sim/speed → speed={Speed} timeScale={Previous}→{TimeScale}",
+            req.Speed, previous, engine.TimeScale);
+
         return Ok(new { success = true, speed = req.Speed, timeScale = engine.TimeScale });
     }
 
     // ── POST /api/sim/components ──────────────────────────────────────────────
-    // Place a new component. Deferred to #33 — returns 501 with an explanation.
     [HttpPost("components")]
-    public IActionResult PlaceComponent() =>
-        StatusCode(StatusCodes.Status501NotImplemented, new
+    public IActionResult PlaceComponent([FromBody] PlaceComponentRequest req)
+    {
+        var dir = ParseDirection(req.Facing);
+        var pos = new GridCoord(req.GridX, req.GridY);
+
+        ICommand? cmd = req.Kind switch
         {
-            success = false,
-            errorMessage = "PlaceComponent not yet implemented — tracked in issue #33.",
-        });
+            "package_generator" => new PlacePackageGeneratorCommand(pos, dir,
+                req.SpawnRate ?? 1f,
+                req.Sku       ?? "PKG",
+                req.Weight    ?? 1f,
+                req.Size      ?? 1f),
+            "package_exit" => new PlacePackageExitCommand(pos, dir),
+            _ => null,
+        };
+
+        if (cmd is null)
+        {
+            logger.LogWarning(
+                "POST /api/sim/components → 400 unknown kind={Kind}",
+                req.Kind);
+            return BadRequest(new { success = false, errorMessage = $"Unknown component kind: {req.Kind}" });
+        }
+
+        queue.Enqueue(cmd);
+
+        logger.LogInformation(
+            "POST /api/sim/components → enqueued {Kind} at ({X},{Y}) facing={Facing}",
+            req.Kind, req.GridX, req.GridY, req.Facing ?? "North");
+
+        return Accepted();
+    }
+
+    // ── PUT /api/sim/components/{id} ──────────────────────────────────────────
+    [HttpPut("components/{id:int}")]
+    public IActionResult ConfigureComponent(int id, [FromBody] Dictionary<string, string> props)
+    {
+        if (props is null || props.Count == 0)
+        {
+            logger.LogWarning("PUT /api/sim/components/{Id} → 400 empty properties", id);
+            return BadRequest(new { success = false, errorMessage = "Empty properties" });
+        }
+
+        queue.Enqueue(new ConfigureComponentCommand(id, props));
+
+        logger.LogInformation(
+            "PUT /api/sim/components/{Id} → enqueued configure [{Keys}]",
+            id, string.Join(", ", props.Keys));
+
+        return Accepted();
+    }
 
     // ── DELETE /api/sim/components/{id} ───────────────────────────────────────
     [HttpDelete("components/{id:int}")]
-    public IActionResult RemoveComponent(int id) =>
-        StatusCode(StatusCodes.Status501NotImplemented, new
+    public IActionResult RemoveComponent(int id)
+    {
+        logger.LogWarning("DELETE /api/sim/components/{Id} → 501 not yet implemented", id);
+        return StatusCode(StatusCodes.Status501NotImplemented, new
         {
-            success = false,
-            errorMessage = $"RemoveComponent({id}) not yet implemented — tracked in issue #33.",
+            success      = false,
+            errorMessage = $"RemoveComponent({id}) not yet implemented.",
         });
-
-    // ── PATCH /api/sim/components/{id} ────────────────────────────────────────
-    // Body: { "properties": { "key": "value" } }
-    [HttpPatch("components/{id:int}")]
-    public IActionResult ConfigureComponent(int id) =>
-        StatusCode(StatusCodes.Status501NotImplemented, new
-        {
-            success = false,
-            errorMessage = $"ConfigureComponent({id}) not yet implemented — tracked in issue #33.",
-        });
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
+
+    private static SimDirection ParseDirection(string? s) => s switch
+    {
+        "East"  => SimDirection.East,
+        "South" => SimDirection.South,
+        "West"  => SimDirection.West,
+        _       => SimDirection.North,
+    };
 
     private static string KindString(SimComponentType type) => type switch
     {
@@ -150,3 +214,13 @@ public sealed class SimulationController(SimulationEngine engine) : ControllerBa
 }
 
 public sealed record ChangeSpeedRequest(int Speed);
+
+public sealed record PlaceComponentRequest(
+    string  Kind,
+    int     GridX,
+    int     GridY,
+    string? Facing    = "North",
+    float?  SpawnRate = null,
+    string? Sku       = null,
+    float?  Weight    = null,
+    float?  Size      = null);
