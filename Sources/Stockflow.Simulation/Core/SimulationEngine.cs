@@ -40,9 +40,31 @@ public class SimulationEngine
     {
         PlacePackageGeneratorCommand cmd => PlacePackageGenerator(cmd),
         PlacePackageExitCommand      cmd => PlacePackageExit(cmd),
+        PlaceOneWayConveyorCommand   cmd => PlaceOneWayConveyor(cmd),
+        PlaceConveyorTurnCommand     cmd => PlaceConveyorTurn(cmd),
         ConfigureComponentCommand    cmd => ConfigureComponent(cmd),
         _                                => CommandResult.Fail($"Unknown command: {command.GetType().Name}"),
     };
+
+    private CommandResult PlaceOneWayConveyor(PlaceOneWayConveyorCommand cmd)
+    {
+        var conv = new OneWayConveyor(_nextComponentId++, cmd.Position, cmd.Facing, cmd.Speed, Graph);
+        if (!Grid.TryPlace(conv))
+            return CommandResult.Fail($"Cell {cmd.Position} is occupied or out of bounds");
+        State.Components.Add(conv);
+        AutoConnect(conv);
+        return CommandResult.Ok();
+    }
+
+    private CommandResult PlaceConveyorTurn(PlaceConveyorTurnCommand cmd)
+    {
+        var turn = new ConveyorTurn(_nextComponentId++, cmd.Position, cmd.Facing, cmd.Turn, cmd.Speed, Graph);
+        if (!Grid.TryPlace(turn))
+            return CommandResult.Fail($"Cell {cmd.Position} is occupied or out of bounds");
+        State.Components.Add(turn);
+        AutoConnect(turn);
+        return CommandResult.Ok();
+    }
 
     private CommandResult PlacePackageGenerator(PlacePackageGeneratorCommand cmd)
     {
