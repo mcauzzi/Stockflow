@@ -43,6 +43,7 @@ public class SimulationEngine
         PlaceOneWayConveyorCommand   cmd => PlaceOneWayConveyor(cmd),
         PlaceConveyorTurnCommand     cmd => PlaceConveyorTurn(cmd),
         ConfigureComponentCommand    cmd => ConfigureComponent(cmd),
+        RemoveComponentCommand       cmd => RemoveComponent(cmd),
         _                                => CommandResult.Fail($"Unknown command: {command.GetType().Name}"),
     };
 
@@ -105,9 +106,36 @@ public class SimulationEngine
                 gen.IsEnabled = enabled;
             return CommandResult.Ok();
         }
+        if (component is OneWayConveyor conv)
+        {
+            if (cmd.Properties.TryGetValue("speed", out var sp) && float.TryParse(sp, out var speed) && speed > 0)
+                conv.Speed = speed;
+            return CommandResult.Ok();
+        }
+        if (component is ConveyorTurn turn)
+        {
+            if (cmd.Properties.TryGetValue("speed", out var sp) && float.TryParse(sp, out var speed) && speed > 0)
+                turn.Speed = speed;
+            return CommandResult.Ok();
+        }
         return component is null
             ? CommandResult.Fail($"Component {cmd.ComponentId} not found")
             : CommandResult.Fail($"Component {cmd.ComponentId} ({component.Type}) is not configurable");
+    }
+
+    private CommandResult RemoveComponent(RemoveComponentCommand cmd)
+    {
+        var component = State.Components.Find(c => c.Id == cmd.ComponentId);
+        if (component is null)
+            return CommandResult.Fail($"Component {cmd.ComponentId} not found");
+
+        foreach (var entity in State.Entities.GetByComponent(cmd.ComponentId).ToList())
+            State.Entities.Despawn(entity.Id);
+
+        Graph.DisconnectAll(component);
+        Grid.TryRemove(component.Position);
+        State.Components.Remove(component);
+        return CommandResult.Ok();
     }
 
     // When a component is placed, auto-wire it to any adjacent compatible ports.

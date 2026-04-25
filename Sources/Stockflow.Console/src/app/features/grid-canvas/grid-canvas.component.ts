@@ -145,15 +145,20 @@ const FLOORS = [
                     text-anchor="middle" opacity="0.8">GEN</text>
             </ng-container>
 
-            <!-- Package Exit: coral square with EXIT label -->
+            <!-- Package Exit: coral square with input-side arrow and EXIT label -->
             <ng-container *ngSwitchCase="'package_exit'">
               <rect x="1" y="1" [attr.width]="CELL-2" [attr.height]="CELL-2"
                     fill="#1e0e0e"
                     [attr.stroke]="c.id === selectedId ? '#f5a623' : '#4a1e1e'"
                     [attr.stroke-width]="c.id === selectedId ? 1.5 : 1"/>
-              <text [attr.x]="CELL/2" [attr.y]="CELL/2+3"
-                    font-size="6" fill="#f87171" font-family="JetBrains Mono,monospace"
-                    text-anchor="middle" letter-spacing="0.03em">EXIT</text>
+              <!-- Arrow enters from the input side (Facing.Opposite) toward center -->
+              <g [attr.transform]="'rotate('+facingRot(c.facing)+' '+CELL/2+' '+CELL/2+')'">
+                <line x1="3" [attr.y1]="CELL/2" x2="10" [attr.y2]="CELL/2" stroke="#f87171" stroke-width="1.2"/>
+                <polygon [attr.points]="arrowPtsExit()" fill="#f87171"/>
+              </g>
+              <text [attr.x]="CELL/2" [attr.y]="CELL-5"
+                    font-size="5" fill="#f87171" font-family="JetBrains Mono,monospace"
+                    text-anchor="middle" letter-spacing="0.03em" opacity="0.8">EXIT</text>
             </ng-container>
 
             <ng-container *ngSwitchDefault>
@@ -364,6 +369,12 @@ export class GridCanvasComponent implements OnChanges {
   arrowPts(): string {
     const x2 = CELL - 5, y = CELL / 2;
     return `${x2-5},${y-3} ${x2},${y} ${x2-5},${y+3}`;
+  }
+
+  // Arrowhead pointing right at x=13, centered vertically — used for PackageExit input indicator
+  arrowPtsExit(): string {
+    const x = 13, y = CELL / 2;
+    return `${x-4},${y-3} ${x},${y} ${x-4},${y+3}`;
   }
 
   // Quarter-circle arc: radius = CELL/2 - 4 = 10 (for CELL=28)

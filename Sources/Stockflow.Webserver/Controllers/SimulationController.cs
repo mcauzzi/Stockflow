@@ -127,9 +127,10 @@ public sealed class SimulationController(
                 req.Weight    ?? 1f,
                 req.Size      ?? 1f),
             "package_exit"    => new PlacePackageExitCommand(pos, dir),
-            "conveyor_oneway" => new PlaceOneWayConveyorCommand(pos, dir,0.1f),
+            "conveyor_oneway" => new PlaceOneWayConveyorCommand(pos, dir, req.Speed ?? 1f),
             "conveyor_turn"   => new PlaceConveyorTurnCommand(pos, dir,
-                req.Turn == "Left" ? TurnSide.Left : TurnSide.Right),
+                req.Turn == "Left" ? TurnSide.Left : TurnSide.Right,
+                req.Speed ?? 1f),
             _ => null,
         };
 
@@ -173,12 +174,10 @@ public sealed class SimulationController(
     [HttpDelete("components/{id:int}")]
     public IActionResult RemoveComponent(int id)
     {
-        logger.LogWarning("DELETE /api/sim/components/{Id} → 501 not yet implemented", id);
-        return StatusCode(StatusCodes.Status501NotImplemented, new
-        {
-            success      = false,
-            errorMessage = $"RemoveComponent({id}) not yet implemented.",
-        });
+        queue.Enqueue(new RemoveComponentCommand(id));
+
+        logger.LogInformation("DELETE /api/sim/components/{Id} → enqueued remove", id);
+        return Accepted();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -221,7 +220,13 @@ public sealed class SimulationController(
         if (c is ConveyorTurn turn)
             return new()
             {
-                ["turn"] = turn.Turn == TurnSide.Right ? "right" : "left",
+                ["turn"]  = turn.Turn == TurnSide.Right ? "right" : "left",
+                ["speed"] = turn.Speed.ToString("F3"),
+            };
+        if (c is OneWayConveyor conv)
+            return new()
+            {
+                ["speed"] = conv.Speed.ToString("F3"),
             };
         return null;
     }
@@ -238,4 +243,5 @@ public sealed record PlaceComponentRequest(
     string? Sku       = null,
     float?  Weight    = null,
     float?  Size      = null,
-    string? Turn      = null);
+    string? Turn      = null,
+    float?  Speed     = null);
