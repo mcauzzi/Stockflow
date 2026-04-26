@@ -192,11 +192,14 @@ public sealed class SimulationHostedService : BackgroundService
         Vector3 pos = Vector3.Zero;
         if (byId.TryGetValue(s.CurrentComponentId, out var comp))
         {
-            // Interpolate 2D grid position: entity moves from cell entry to exit along facing direction.
+            // Interpolated cell-space position of the entity centre.
+            // Convention: cell (X,Y) spans [X, X+1) × [Y, Y+1); the centre is (X+0.5, Y+0.5).
+            // Progress 0 = entity at the entry edge (opposite to facing), 1 = exit edge.
+            // pos = cellCentre + facingOffset * (progress - 0.5).
             var off = comp.Facing.ToOffset();
             pos = new Vector3(
-                comp.Position.X + off.X * s.Progress,
-                comp.Position.Y + off.Y * s.Progress,
+                comp.Position.X + 0.5f + off.X * (s.Progress - 0.5f),
+                comp.Position.Y + 0.5f + off.Y * (s.Progress - 0.5f),
                 0f);
         }
         return new()
