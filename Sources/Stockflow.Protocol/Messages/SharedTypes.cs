@@ -29,6 +29,7 @@ public readonly struct Vector3
 public static class ComponentKinds
 {
     public const string OneWayConveyor   = "conveyor_oneway";
+    public const string ConveyorTurn     = "conveyor_turn";
     public const string PackageGenerator = "package_generator";
     public const string PackageExit      = "package_exit";
 }

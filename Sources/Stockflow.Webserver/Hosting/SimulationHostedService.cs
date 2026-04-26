@@ -7,6 +7,7 @@ using Stockflow.Simulation.Core;
 using Stockflow.Simulation.Grid;
 using Stockflow.Webserver.Configuration;
 using Stockflow.Webserver.Queue;
+using Stockflow.Webserver.Serialization;
 using Stockflow.Webserver.WebSocket;
 using SimEntityState    = Stockflow.Simulation.Entity.EntityState;
 using SimComponentType  = Stockflow.Simulation.Component.ComponentType;
@@ -18,9 +19,6 @@ namespace Stockflow.Webserver.Hosting;
 
 public sealed class SimulationHostedService : BackgroundService
 {
-    // SimSpeed ordinal → TimeScale multiplier (matches SimSpeed enum order)
-    private static readonly float[] TimeScaleBySpeed = [0f, 1f, 2f, 5f, 10f, 1f];
-
     private readonly SimulationEngine    _engine;
     private readonly IClientCommandQueue _queue;
     private readonly IRestCommandQueue   _restQueue;
@@ -87,7 +85,7 @@ public sealed class SimulationHostedService : BackgroundService
                 return;
 
             case ChangeSpeedMessage changeSpeed:
-                _engine.TimeScale = TimeScaleBySpeed[(int)changeSpeed.Speed];
+                _engine.TimeScale = SpeedTable.TimeScaleFor((int)changeSpeed.Speed);
                 await session.SendAsync(Ack(msg.CommandId), ct).ConfigureAwait(false);
                 return;
 
@@ -211,51 +209,10 @@ public sealed class SimulationHostedService : BackgroundService
     private static ComponentState ToProtoComponent(ISimComponent c) => new()
     {
         Id         = c.Id,
-        Kind       = KindString(c.Type),
+        Kind       = ComponentSerializer.KindString(c.Type),
         GridX      = c.Position.X,
         GridY      = c.Position.Y,
         Facing     = (ProtoDirection)(int)c.Facing,
-        Properties = BuildProperties(c),
-    };
-
-    private static Dictionary<string, string>? BuildProperties(ISimComponent c)
-    {
-        if (c is PackageGenerator gen)
-            return new()
-            {
-                ["spawnRate"] = gen.SpawnRate.ToString("F3"),
-                ["sku"]       = gen.Sku,
-                ["weight"]    = gen.Weight.ToString("F3"),
-                ["size"]      = gen.Size.ToString("F3"),
-                ["enabled"]   = gen.IsEnabled ? "true" : "false",
-            };
-        if (c is PackageExit exit)
-            return new()
-            {
-                ["totalProcessed"]     = exit.TotalProcessed.ToString(),
-                ["throughput"]         = exit.Throughput.ToString("F3"),
-                ["avgFulfillmentTime"] = exit.AvgFulfillmentTime.ToString("F3"),
-            };
-        if (c is ConveyorTurn turn)
-            return new()
-            {
-                ["turn"]  = turn.Turn == TurnSide.Right ? "right" : "left",
-                ["speed"] = turn.Speed.ToString("F3"),
-            };
-        if (c is OneWayConveyor conv)
-            return new()
-            {
-                ["speed"] = conv.Speed.ToString("F3"),
-            };
-        return null;
-    }
-
-    private static string KindString(SimComponentType type) => type switch
-    {
-        SimComponentType.OneWayConveyor   => ComponentKinds.OneWayConveyor,
-        SimComponentType.ConveyorTurn     => "conveyor_turn",
-        SimComponentType.PackageGenerator => ComponentKinds.PackageGenerator,
-        SimComponentType.PackageExit      => ComponentKinds.PackageExit,
-        _                                 => type.ToString(),
+        Properties = ComponentSerializer.BuildProperties(c),
     };
 }
