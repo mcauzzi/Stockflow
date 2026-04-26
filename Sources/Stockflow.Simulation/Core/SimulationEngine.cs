@@ -8,6 +8,7 @@ namespace Stockflow.Simulation.Core;
 
 public class SimulationEngine
 {
+    private readonly Dictionary<Type, Func<ICommand, int, ISimComponent>> _placementFactories;
     private HashSet<int>                 _knownComponentIds = new();
     private HashSet<int>                 _knownEntityIds    = new();
     private Dictionary<int, EntityState> _lastEntityStates  = new();
@@ -19,6 +20,32 @@ public class SimulationEngine
         Grid  = new GridManager(width, length, height);
         Graph = new RoutingGraph();
         State = new();
+
+        _placementFactories = new()
+        {
+            [typeof(PlaceOneWayConveyorCommand)] = (c, id) =>
+            {
+                var x = (PlaceOneWayConveyorCommand)c;
+                return new OneWayConveyor(id, x.Position, x.Facing, x.Speed, Graph);
+            },
+            [typeof(PlaceConveyorTurnCommand)] = (c, id) =>
+            {
+                var x = (PlaceConveyorTurnCommand)c;
+                return new ConveyorTurn(id, x.Position, x.Facing, x.Turn, x.Speed, Graph);
+            },
+            [typeof(PlacePackageGeneratorCommand)] = (c, id) =>
+            {
+                var x = (PlacePackageGeneratorCommand)c;
+                return new PackageGenerator(id, x.Position, x.Facing,
+                                            x.SpawnRate, x.Sku, x.Weight, x.Size,
+                                            Graph, State.Entities);
+            },
+            [typeof(PlacePackageExitCommand)] = (c, id) =>
+            {
+                var x = (PlacePackageExitCommand)c;
+                return new PackageExit(id, x.Position, x.Facing, State.Entities);
+            },
+        };
     }
 
     public SimulationClock Clock          { get; }
@@ -36,56 +63,26 @@ public class SimulationEngine
             component.Tick(deltaTime);
     }
 
-    public CommandResult ProcessCommand(ICommand command) => command switch
+    public CommandResult ProcessCommand(ICommand command)
     {
-        PlacePackageGeneratorCommand cmd => PlacePackageGenerator(cmd),
-        PlacePackageExitCommand      cmd => PlacePackageExit(cmd),
-        PlaceOneWayConveyorCommand   cmd => PlaceOneWayConveyor(cmd),
-        PlaceConveyorTurnCommand     cmd => PlaceConveyorTurn(cmd),
-        ConfigureComponentCommand    cmd => ConfigureComponent(cmd),
-        RemoveComponentCommand       cmd => RemoveComponent(cmd),
-        _                                => CommandResult.Fail($"Unknown command: {command.GetType().Name}"),
-    };
+        if (_placementFactories.TryGetValue(command.GetType(), out var factory))
+            return PlaceComponent(command, factory);
 
-    private CommandResult PlaceOneWayConveyor(PlaceOneWayConveyorCommand cmd)
-    {
-        var conv = new OneWayConveyor(_nextComponentId++, cmd.Position, cmd.Facing, cmd.Speed, Graph);
-        if (!Grid.TryPlace(conv))
-            return CommandResult.Fail($"Cell {cmd.Position} is occupied or out of bounds");
-        State.Components.Add(conv);
-        AutoConnect(conv);
-        return CommandResult.Ok();
+        return command switch
+        {
+            ConfigureComponentCommand cmd => ConfigureComponent(cmd),
+            RemoveComponentCommand    cmd => RemoveComponent(cmd),
+            _                              => CommandResult.Fail($"Unknown command: {command.GetType().Name}"),
+        };
     }
 
-    private CommandResult PlaceConveyorTurn(PlaceConveyorTurnCommand cmd)
+    private CommandResult PlaceComponent(ICommand cmd, Func<ICommand, int, ISimComponent> factory)
     {
-        var turn = new ConveyorTurn(_nextComponentId++, cmd.Position, cmd.Facing, cmd.Turn, cmd.Speed, Graph);
-        if (!Grid.TryPlace(turn))
-            return CommandResult.Fail($"Cell {cmd.Position} is occupied or out of bounds");
-        State.Components.Add(turn);
-        AutoConnect(turn);
-        return CommandResult.Ok();
-    }
-
-    private CommandResult PlacePackageGenerator(PlacePackageGeneratorCommand cmd)
-    {
-        var gen = new PackageGenerator(_nextComponentId++, cmd.Position, cmd.Facing,
-                                       cmd.SpawnRate, cmd.Sku, cmd.Weight, cmd.Size,
-                                       Graph, State.Entities);
-        if (!Grid.TryPlace(gen))
-            return CommandResult.Fail($"Cell {cmd.Position} is occupied or out of bounds");
-        State.Components.Add(gen);
-        AutoConnect(gen);
-        return CommandResult.Ok();
-    }
-
-    private CommandResult PlacePackageExit(PlacePackageExitCommand cmd)
-    {
-        var exit = new PackageExit(_nextComponentId++, cmd.Position, cmd.Facing, State.Entities);
-        if (!Grid.TryPlace(exit))
-            return CommandResult.Fail($"Cell {cmd.Position} is occupied or out of bounds");
-        State.Components.Add(exit);
-        AutoConnect(exit);
+        var component = factory(cmd, _nextComponentId++);
+        if (!Grid.TryPlace(component))
+            return CommandResult.Fail($"Cell {component.Position} is occupied or out of bounds");
+        State.Components.Add(component);
+        AutoConnect(component);
         return CommandResult.Ok();
     }
 
