@@ -42,4 +42,16 @@ public class EntityManager
         _pool.Enqueue(entity);
         return true;
     }
+
+    // Svuota le entità attive (riusando il pool) preservando _nextId per
+    // evitare collisioni di ID con le entità segnalate da GetStateDelta.
+    public void Reset()
+    {
+        foreach (var entity in _active.Values)
+        {
+            entity.Reset();
+            _pool.Enqueue(entity);
+        }
+        _active.Clear();
+    }
 }

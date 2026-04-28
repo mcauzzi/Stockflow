@@ -16,4 +16,11 @@ public class SimulationClock
     {
         _simulatedTime += delta;
     }
+
+    // Azzera il tempo simulato preservando TimeScale (la velocità di playback
+    // appartiene alla preferenza utente, non allo scenario).
+    public void Reset()
+    {
+        _simulatedTime = 0f;
+    }
 }
