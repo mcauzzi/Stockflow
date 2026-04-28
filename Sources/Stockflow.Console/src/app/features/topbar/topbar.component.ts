@@ -1,5 +1,7 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
-import { NgFor } from '@angular/common';
+import { Component, EventEmitter, Input, Output, computed, inject } from '@angular/core';
+import { NgFor, NgIf } from '@angular/common';
+
+import { SessionsService } from '../../core/services/sessions.service';
 
 export type Tab = 'LAYOUT' | 'OPERATE' | 'ORDERS' | 'METRICS' | 'WORKSHOP' | 'PRO';
 const TABS: { id: Tab; key: string }[] = [
@@ -14,7 +16,7 @@ const TABS: { id: Tab; key: string }[] = [
 @Component({
   selector: 'app-topbar',
   standalone: true,
-  imports: [NgFor],
+  imports: [NgFor, NgIf],
   template: `
     <div class="topbar">
       <div class="brand">STOCKFLOW<span class="sub">·CON</span></div>
@@ -30,7 +32,33 @@ const TABS: { id: Tab; key: string }[] = [
                 [style.box-shadow]="connected ? '0 0 6px var(--green)' : 'none'"></span>
           {{ connected ? 'SIM ACTIVE' : 'DISCONNECTED' }}
         </span>
-        <span>SESSION <span class="amber">#A4B21</span></span>
+
+        <!-- ── Session indicator + lifecycle controls ────────────────── -->
+        <ng-container *ngIf="sessions.currentSession(); else noSession">
+          <span>
+            SESSION
+            <span [class.amber]="isRunning()" [class.dim2]="!isRunning()">
+              #{{ shortId() }}
+            </span>
+            <span class="dim2"> · {{ statusLabel() }}</span>
+          </span>
+          <button class="mini-btn"
+                  (click)="onTerminate()"
+                  *ngIf="isRunning()"
+                  [disabled]="busy">STOP</button>
+          <button class="mini-btn"
+                  (click)="onStart()"
+                  *ngIf="!isRunning()"
+                  [disabled]="busy">START</button>
+        </ng-container>
+        <ng-template #noSession>
+          <span class="dim">SESSION <span class="dim2">none</span></span>
+          <button class="mini-btn" (click)="onStart()" [disabled]="busy">START</button>
+        </ng-template>
+
+        <button class="mini-btn"
+                (click)="openScenarios.emit()">SCENARIOS</button>
+
         <span class="live-chip">
           <span class="dot" [style.background]="connected ? 'var(--green)' : 'var(--red-dim)'"></span>
           WS :9600
@@ -103,13 +131,61 @@ const TABS: { id: Tab; key: string }[] = [
       flex-shrink: 0;
     }
     .live-chip { display: flex; align-items: center; }
+    .mini-btn {
+      background: transparent;
+      border: 1px solid var(--border-bright);
+      color: var(--text-1);
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .1em;
+      padding: 2px 6px;
+      cursor: pointer;
+    }
+    .mini-btn:hover:not(:disabled) { background: var(--bg-2); color: var(--amber); border-color: var(--amber); }
+    .mini-btn:disabled { opacity: .35; cursor: not-allowed; }
+    .dim  { color: var(--text-3); }
+    .dim2 { color: var(--text-3); opacity: .7; }
+    .amber { color: var(--amber); }
   `],
 })
 export class TopbarComponent {
   @Input() activeTab: Tab = 'OPERATE';
   @Input() connected = false;
   @Input() restOnline = false;
-  @Output() tabChange = new EventEmitter<Tab>();
+  @Output() tabChange     = new EventEmitter<Tab>();
+  @Output() openScenarios = new EventEmitter<void>();
 
   readonly tabs = TABS;
+  readonly sessions = inject(SessionsService);
+
+  busy = false;
+
+  readonly shortId = computed(() => {
+    const id = this.sessions.currentSession()?.id;
+    return id ? id.slice(0, 5).toUpperCase() : '';
+  });
+
+  readonly isRunning = computed(() =>
+    this.sessions.currentSession()?.status === 'Running');
+
+  readonly statusLabel = computed(() =>
+    this.sessions.currentSession()?.status?.toUpperCase() ?? '');
+
+  onStart(): void {
+    this.busy = true;
+    this.sessions.start().subscribe({
+      next: () => (this.busy = false),
+      error: () => (this.busy = false),
+    });
+  }
+
+  onTerminate(): void {
+    const s = this.sessions.currentSession();
+    if (!s) return;
+    this.busy = true;
+    this.sessions.terminate(s.id).subscribe({
+      next: () => (this.busy = false),
+      error: () => (this.busy = false),
+    });
+  }
 }
