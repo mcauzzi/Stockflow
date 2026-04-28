@@ -5,6 +5,7 @@ using Stockflow.Simulation.Core;
 using Stockflow.Webserver.Configuration;
 using Stockflow.Webserver.Hosting;
 using Stockflow.Webserver.Queue;
+using Stockflow.Webserver.Scenarios;
 using Stockflow.Webserver.WebSocket;
 
 MessagePackConfig.Initialize();
@@ -37,6 +38,12 @@ builder.Services.AddSingleton<SimulationEngine>(sp =>
 {
     var cfg = sp.GetRequiredService<IOptions<ServerConfig>>().Value;
     return new SimulationEngine(cfg.GridWidth, cfg.GridLength, cfg.GridFloors);
+});
+builder.Services.AddSingleton<IScenarioRepository>(sp =>
+{
+    var env  = sp.GetRequiredService<IHostEnvironment>();
+    var path = Path.Combine(env.ContentRootPath, "Scenarios");
+    return new FileScenarioRepository(path);
 });
 builder.Services.AddHostedService<SimulationHostedService>();
 
