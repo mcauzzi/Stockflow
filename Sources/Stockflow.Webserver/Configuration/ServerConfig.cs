@@ -25,6 +25,12 @@ public sealed class ServerConfig
     public int GridWidth  { get; set; } = 50;
     public int GridLength { get; set; } = 50;
     public int GridFloors { get; set; } = 1;
+
+    /// <summary>
+    /// Filesystem path for scenario JSON files. Relative paths resolve against
+    /// <see cref="IHostEnvironment.ContentRootPath"/>.
+    /// </summary>
+    public string ScenariosPath { get; set; } = "Scenarios";
 }
 
 public enum ServerMode

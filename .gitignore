@@ -5,3 +5,7 @@ riderModule.iml
 /_ReSharper.Caches/
 /.idea/
 /.claude/worktrees
+
+# Scenario JSON files written at runtime live next to the .cs DTOs in this
+# folder; only the source code is tracked.
+/Sources/Stockflow.Webserver/Scenarios/*.json

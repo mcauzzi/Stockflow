@@ -13,6 +13,7 @@ import { EventLogComponent } from './features/event-log/event-log.component';
 import { OrdersViewComponent } from './features/orders-view/orders-view.component';
 import { MetricsViewComponent } from './features/metrics-view/metrics-view.component';
 import { StubViewComponent } from './features/stub-view/stub-view.component';
+import { ScenariosPanelComponent } from './features/scenarios-panel/scenarios-panel.component';
 import { ComponentState } from './core/models/protocol';
 import { genSpark } from './core/mock/sim-mock';
 
@@ -25,13 +26,15 @@ import { genSpark } from './core/mock/sim-mock';
     PaletteComponent, GridCanvasComponent, InspectorComponent,
     EventLogComponent,
     OrdersViewComponent, MetricsViewComponent, StubViewComponent,
+    ScenariosPanelComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App implements OnInit {
-  readonly activeTab      = signal<Tab>('OPERATE');
-  readonly selectedComp   = signal<ComponentState | null>(null);
+  readonly activeTab       = signal<Tab>('OPERATE');
+  readonly scenariosOpen   = signal(false);
+  readonly selectedComp    = signal<ComponentState | null>(null);
   readonly liveSelected   = computed(() => {
     const sel = this.selectedComp();
     if (!sel) return null;
