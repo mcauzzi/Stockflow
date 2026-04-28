@@ -6,6 +6,7 @@ using Stockflow.Webserver.Configuration;
 using Stockflow.Webserver.Hosting;
 using Stockflow.Webserver.Queue;
 using Stockflow.Webserver.Scenarios;
+using Stockflow.Webserver.Sessions;
 using Stockflow.Webserver.WebSocket;
 
 MessagePackConfig.Initialize();
@@ -45,6 +46,7 @@ builder.Services.AddSingleton<IScenarioRepository>(sp =>
     var path = Path.Combine(env.ContentRootPath, "Scenarios");
     return new FileScenarioRepository(path);
 });
+builder.Services.AddSingleton<ISessionManager, SessionManager>();
 builder.Services.AddHostedService<SimulationHostedService>();
 
 builder.Services.AddControllers();
