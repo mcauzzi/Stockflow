@@ -7,8 +7,8 @@ import {
   StateDeltaMessage, FullStateMessage,
 } from '../models/protocol';
 import { MockEvent, INITIAL_EVENTS, genSpark } from '../mock/sim-mock';
+import { REST_BASE } from '../config';
 
-const REST_BASE = 'http://localhost:9601';
 const MAX_EVENTS = 120;
 
 @Injectable({ providedIn: 'root' })

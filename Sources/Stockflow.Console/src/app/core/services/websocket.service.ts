@@ -5,8 +5,7 @@ import {
   ServerMessage, StateDeltaMessage, FullStateMessage, CommandResultMessage,
   EntityState, ComponentState, SimEvent, MetricsSnapshot, Direction, EntityStatus,
 } from '../models/protocol';
-
-const WS_URL = 'ws://localhost:9600/ws';
+import { WS_URL } from '../config';
 
 @Injectable({ providedIn: 'root' })
 export class WebSocketService implements OnDestroy {
