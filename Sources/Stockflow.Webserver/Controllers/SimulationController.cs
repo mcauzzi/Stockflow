@@ -7,7 +7,6 @@ using Stockflow.Simulation.Grid;
 using Stockflow.Webserver.Configuration;
 using Stockflow.Webserver.Queue;
 using Stockflow.Webserver.Serialization;
-using SimDirection     = Stockflow.Simulation.Component.Direction;
 
 namespace Stockflow.Webserver.Controllers;
 
@@ -113,7 +112,7 @@ public sealed class SimulationController(
     [HttpPost("components")]
     public IActionResult PlaceComponent([FromBody] PlaceComponentRequest req)
     {
-        var dir = ParseDirection(req.Facing);
+        var dir = DirectionParser.Parse(req.Facing);
         var pos = new GridCoord(req.GridX, req.GridY);
 
         ICommand? cmd = req.Kind switch
@@ -177,15 +176,6 @@ public sealed class SimulationController(
         return Accepted();
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private static SimDirection ParseDirection(string? s) => s switch
-    {
-        "East"  => SimDirection.East,
-        "South" => SimDirection.South,
-        "West"  => SimDirection.West,
-        _       => SimDirection.North,
-    };
 }
 
 public sealed record ChangeSpeedRequest(int Speed);
