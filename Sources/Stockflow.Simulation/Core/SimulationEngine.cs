@@ -51,8 +51,8 @@ public class SimulationEngine
     public SimulationClock Clock          { get; }
     public float           TimeScale      { get => Clock.TimeScale; set => Clock.TimeScale = value; }
     public float           SimulationTime => Clock.SimulatedTime;
-    public GridManager     Grid           { get; }
-    public RoutingGraph    Graph          { get; }
+    public GridManager     Grid           { get; private set; }
+    public RoutingGraph    Graph          { get; private set; }
     public SimulationState State          { get; }
 
     // deltaTime è calcolato dal caller: 1f / tickRate * engine.TimeScale
@@ -72,8 +72,39 @@ public class SimulationEngine
         {
             ConfigureComponentCommand cmd => ConfigureComponent(cmd),
             RemoveComponentCommand    cmd => RemoveComponent(cmd),
+            LoadScenarioCommand       cmd => LoadScenario(cmd),
             _                              => CommandResult.Fail($"Unknown command: {command.GetType().Name}"),
         };
+    }
+
+    private CommandResult LoadScenario(LoadScenarioCommand cmd)
+    {
+        if (cmd.Width <= 0 || cmd.Length <= 0 || cmd.Floors <= 0)
+            return CommandResult.Fail($"Scenario dimensions must be positive (got {cmd.Width}x{cmd.Length}x{cmd.Floors})");
+
+        ResetAndLoad(cmd.Width, cmd.Length, cmd.Floors);
+
+        for (var i = 0; i < cmd.Preplaced.Count; i++)
+        {
+            var pre    = cmd.Preplaced[i];
+            var result = ProcessCommand(pre);
+            if (!result.Success)
+                return CommandResult.Fail($"Preplaced component {i} ({pre.GetType().Name}) failed: {result.ErrorMessage}");
+        }
+
+        return CommandResult.Ok();
+    }
+
+    // Wipe lo stato del mondo lasciando crescere i counter ID monotonici:
+    // così GetStateDelta riporta correttamente le vecchie ID come rimosse e
+    // le nuove come aggiunte, senza collisioni cross-scenario.
+    private void ResetAndLoad(int width, int length, int floors)
+    {
+        Grid  = new GridManager(width, length, floors);
+        Graph = new RoutingGraph();
+        State.Components.Clear();
+        State.Entities.Reset();
+        Clock.Reset();
     }
 
     private CommandResult PlaceComponent(ICommand cmd, Func<ICommand, int, ISimComponent> factory)
