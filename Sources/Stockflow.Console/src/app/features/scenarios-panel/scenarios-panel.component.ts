@@ -3,7 +3,11 @@ import { NgFor, NgIf } from '@angular/common';
 
 import { ScenariosService } from '../../core/services/scenarios.service';
 import { SessionsService }  from '../../core/services/sessions.service';
-import { ScenarioSummary }  from '../../core/models/scenario';
+import { SimStateService }  from '../../core/services/sim-state.service';
+import { Scenario, ScenarioSummary, PreplacedComponent } from '../../core/models/scenario';
+import { ComponentState }  from '../../core/models/protocol';
+
+const ID_PATTERN = /^[a-zA-Z0-9._-]{1,64}$/;
 
 @Component({
   selector: 'app-scenarios-panel',
@@ -16,6 +20,12 @@ import { ScenarioSummary }  from '../../core/models/scenario';
         <span>SCENARIOS</span>
         <span class="hint" *ngIf="!hasSession()">No active session — Start one from the topbar to load.</span>
         <span class="spacer"></span>
+        <button class="btn primary"
+                (click)="onSaveCurrent()"
+                [disabled]="busy() || sim.components().size === 0"
+                title="Snapshot the current grid + placed components as a new scenario">
+          SAVE CURRENT
+        </button>
         <button class="btn ghost" (click)="reload()" [disabled]="loading()">REFRESH</button>
         <button class="btn ghost" (click)="close.emit()" aria-label="close">×</button>
       </div>
@@ -144,6 +154,7 @@ export class ScenariosPanelComponent implements OnInit {
 
   private scenariosSvc = inject(ScenariosService);
   private sessionsSvc  = inject(SessionsService);
+  readonly sim         = inject(SimStateService);
 
   readonly scenarios = signal<ScenarioSummary[]>([]);
   readonly loading   = signal(false);
@@ -194,4 +205,50 @@ export class ScenariosPanelComponent implements OnInit {
       },
     });
   }
+
+  /**
+   * Snapshot dello stato corrente (grid + componenti piazzati) come nuovo
+   * scenario. Le proprietà configurabili (spawnRate, sku, speed, turn, ...)
+   * NON sono incluse perché il formato §6.1 dei preplacedComponents non le
+   * prevede; al ricarico i componenti partiranno con i parametri di default.
+   */
+  onSaveCurrent(): void {
+    const id = prompt('Scenario id (a-z A-Z 0-9 . _ -, max 64 chars):')?.trim();
+    if (!id) return;
+    if (!ID_PATTERN.test(id)) {
+      this.error.set(`Invalid id '${id}' — allowed: a-z A-Z 0-9 . _ - up to 64 chars`);
+      return;
+    }
+    const name = prompt('Scenario name:', id)?.trim();
+    if (!name) return;
+
+    const components = Array.from(this.sim.components().values());
+    const scenario: Scenario = {
+      id,
+      name,
+      gridSize: { width: this.sim.gridWidth(), height: this.sim.gridLength() },
+      preplacedComponents: components.map(toPreplaced),
+    };
+
+    this.busy.set(true);
+    this.error.set(null);
+    this.scenariosSvc.create(scenario).subscribe({
+      next: () => { this.busy.set(false); this.reload(); },
+      error: err => {
+        const msg = err.status === 409
+          ? `Scenario '${id}' already exists`
+          : `Save failed: HTTP ${err.status ?? '?'}`;
+        this.error.set(msg);
+        this.busy.set(false);
+      },
+    });
+  }
+}
+
+function toPreplaced(c: ComponentState): PreplacedComponent {
+  return {
+    type:      c.kind,
+    position:  [c.gridX, c.gridY],
+    direction: (c.facing ?? 'North').toLowerCase(),
+  };
 }

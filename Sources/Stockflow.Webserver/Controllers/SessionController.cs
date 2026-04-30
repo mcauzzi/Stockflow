@@ -141,7 +141,7 @@ public sealed class SessionController(
         {
             "packagegenerator"  or "package_generator" => new PlacePackageGeneratorCommand(pos, dir),
             "packageexit"       or "package_exit"      => new PlacePackageExitCommand(pos, dir),
-            "onewayconveyor"    or "one_way_conveyor" or "conveyor_straight"
+            "onewayconveyor"    or "one_way_conveyor" or "conveyor_straight" or "conveyor_oneway"
                 => new PlaceOneWayConveyorCommand(pos, dir),
             "conveyorturn"      or "conveyor_turn" or "conveyor_curve"
                 => new PlaceConveyorTurnCommand(pos, dir),
