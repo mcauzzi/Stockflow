@@ -27,6 +27,22 @@ dotnet build --configuration Release Stockflow.slnx
 
 Requires **.NET 10.0**.
 
+## Codebase Search (RAG)
+
+For semantic queries about this codebase or its docs — phrasings like "where do we…", "how is X handled", "who uses Y", "find similar implementations of…" — use **`mcp__claude-context__search_code`** with `path: K:\Repositories\Stockflow` **before** falling back to Grep/Glob. The index is semantic and multilingual (Qwen3-Embedding-8B, 4096-dim), and covers both the C#/TS source and the Italian design docs in `Docs/`. Grep/Glob remain the right tool when you already know the exact symbol or filename.
+
+### When the MCP call fails
+
+If `mcp__claude-context__search_code` (or any other `mcp__claude-context__*` tool) returns an error — timeout, connection refused, embedding error, Milvus error, dimension mismatch, etc.:
+
+1. **Stop and surface the exact error to the user.** Quote the error message verbatim. Do not silently fall back to Grep/Glob and do not retry blindly.
+2. **Remind the user to start Ollama.** The Windows Ollama app does **not** auto-start at boot, so the most common failure mode is "Ollama is not running". Suggest opening the tray app, or running a sanity check: `curl http://127.0.0.1:11434/api/tags`.
+3. Only after the user has restarted Ollama (or explicitly tells you to proceed without it) should you fall back to Grep/Glob for the current query.
+
+### Stack reference (host-level)
+
+The vector store runs in Docker from `~/.claude/milvus/` (Milvus 2.5.4 standalone + etcd + minio, all bound to `127.0.0.1`). Health check: `docker ps --filter name=milvus-` should show three healthy containers. Embedding model is pulled in Ollama as `hf.co/Qwen/Qwen3-Embedding-8B-GGUF:Q8_0`. The MCP itself is configured user-level in `~/.claude.json`.
+
 ## Architecture Overview
 
 Stockflow is a warehouse logistics simulator with two deployment targets: consumer (Steam/Unity) and enterprise (B2B/Docker with WMS integration).
