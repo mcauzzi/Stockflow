@@ -201,4 +201,22 @@ public class MergeLogicTests
         var e2 = mgr.Spawn("B", 1f, 1f, 0f, merge, new PortId(1));
         Assert.False(merge.TryAccept(e2, new PortId(1)));
     }
+
+    [Fact]
+    public void SetFacing_RebuildsPortPositions()
+    {
+        var merge = MakeMerge(); // default Facing=North, Position=(0,0)
+
+        // Facing=North: port0=South=(0,1), port1=West=(-1,0), port2=North=(0,-1)
+        Assert.Equal(new GridCoord(0,   1), merge.Ports[0].Position);
+        Assert.Equal(new GridCoord(-1,  0), merge.Ports[1].Position);
+        Assert.Equal(new GridCoord(0,  -1), merge.Ports[2].Position);
+
+        merge.SetFacing(Direction.East);
+
+        // Facing=East: port0=West=(-1,0), port1=North=(0,-1), port2=East=(1,0)
+        Assert.Equal(new GridCoord(-1,  0), merge.Ports[0].Position);
+        Assert.Equal(new GridCoord(0,  -1), merge.Ports[1].Position);
+        Assert.Equal(new GridCoord(1,   0), merge.Ports[2].Position);
+    }
 }
