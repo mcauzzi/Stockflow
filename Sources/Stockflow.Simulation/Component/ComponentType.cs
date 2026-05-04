@@ -6,4 +6,5 @@ public enum ComponentType
     ConveyorTurn,
     PackageGenerator,
     PackageExit,
+    MergeLogic,
 }
