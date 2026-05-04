@@ -30,4 +30,11 @@ public sealed record PlaceConveyorTurnCommand(
     float     Speed = 1f
 ) : ICommand;
 
+public sealed record PlaceMergeLogicCommand(
+    GridCoord Position,
+    Direction Facing,
+    MergeMode Mode  = MergeMode.Alternating,
+    float     Speed = 1f
+) : ICommand;
+
 public sealed record RemoveComponentCommand(int ComponentId) : ICommand;

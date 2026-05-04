@@ -1,3 +1,4 @@
+using Stockflow.Simulation.Commands;
 using Stockflow.Simulation.Component;
 using Stockflow.Simulation.Core;
 using Stockflow.Simulation.Entity;
@@ -99,5 +100,52 @@ public class SimulationEngineTests
         engine.Tick(0.1f);
 
         Assert.Equal(0.1f, engine.SimulationTime, precision: 5);
+    }
+
+    [Fact]
+    public void PlaceMergeLogic_AddsComponentToState()
+    {
+        var engine = new SimulationEngine(10, 10, 1);
+        var cmd    = new PlaceMergeLogicCommand(new GridCoord(5, 5), Direction.North);
+
+        engine.ProcessCommand(cmd);
+
+        var comp = engine.State.Components.Find(c => c.Type == ComponentType.MergeLogic);
+        Assert.NotNull(comp);
+        Assert.Equal(new GridCoord(5, 5), comp.Position);
+    }
+
+    [Fact]
+    public void ConfigureMergeLogic_UpdatesModeAndSpeed()
+    {
+        var engine = new SimulationEngine(10, 10, 1);
+        engine.ProcessCommand(new PlaceMergeLogicCommand(new GridCoord(5, 5), Direction.North));
+        var merge = (MergeLogic)engine.State.Components.Find(c => c.Type == ComponentType.MergeLogic)!;
+
+        engine.ProcessCommand(new ConfigureComponentCommand(merge.Id, new Dictionary<string, string>
+        {
+            ["mode"]  = "priority",
+            ["speed"] = "2.5",
+        }));
+
+        Assert.Equal(MergeMode.Priority, merge.Mode);
+        Assert.Equal(2.5f, merge.Speed);
+    }
+
+    [Fact]
+    public void ConfigureMergeLogic_SetFacing_RebuildsPortPositions()
+    {
+        var engine = new SimulationEngine(10, 10, 1);
+        engine.ProcessCommand(new PlaceMergeLogicCommand(new GridCoord(5, 5), Direction.North));
+        var merge = (MergeLogic)engine.State.Components.Find(c => c.Type == ComponentType.MergeLogic)!;
+
+        engine.ProcessCommand(new ConfigureComponentCommand(merge.Id, new Dictionary<string, string>
+        {
+            ["facing"] = "East",
+        }));
+
+        Assert.Equal(Direction.East, merge.Facing);
+        // Facing=East: outPort at (6,5)
+        Assert.Equal(new GridCoord(6, 5), merge.Ports[2].Position);
     }
 }
