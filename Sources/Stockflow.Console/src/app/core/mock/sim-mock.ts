@@ -48,7 +48,7 @@ export const COMPONENT_LIBRARY = [
   { group: 'CONVEYORS', items: [
     { id: 'conv',   name: 'Straight',    sym: '━', cost: 100,  hotkey: '1', kind: 'conveyor_oneway', live: true  },
     { id: 'curve',  name: 'Curve 90°',   sym: '┗', cost: 120,  hotkey: '2', kind: 'conveyor_turn',   live: true  },
-    { id: 'merge',  name: 'Merge',       sym: '┳', cost: 300,  hotkey: '3', kind: 'merge',           live: false },
+    { id: 'merge',  name: 'Merge',       sym: '┳', cost: 300,  hotkey: '3', kind: 'merge',           live: true  },
     { id: 'divert', name: 'Diverter',    sym: '┻', cost: 400,  hotkey: '4', kind: 'diverter',        live: false },
     { id: 'accum',  name: 'Accumulator', sym: '▣', cost: 600,  hotkey: '5', kind: 'accum',           live: false },
   ]},

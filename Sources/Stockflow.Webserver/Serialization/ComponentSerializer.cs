@@ -17,6 +17,7 @@ public static class ComponentSerializer
         SimComponentType.ConveyorTurn     => ComponentKinds.ConveyorTurn,
         SimComponentType.PackageGenerator => ComponentKinds.PackageGenerator,
         SimComponentType.PackageExit      => ComponentKinds.PackageExit,
+        SimComponentType.MergeLogic       => ComponentKinds.MergeLogic,
         _                                 => type.ToString().ToLowerInvariant(),
     };
 
@@ -44,6 +45,11 @@ public static class ComponentSerializer
         OneWayConveyor conv => new()
         {
             ["speed"] = conv.Speed.ToString("F3"),
+        },
+        MergeLogic m => new()
+        {
+            ["mode"]  = m.Mode == MergeMode.Priority ? "priority" : "alternating",
+            ["speed"] = m.Speed.ToString("F3"),
         },
         _ => null,
     };

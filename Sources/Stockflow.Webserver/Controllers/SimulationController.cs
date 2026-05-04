@@ -127,6 +127,11 @@ public sealed class SimulationController(
             ComponentKinds.ConveyorTurn   => new PlaceConveyorTurnCommand(pos, dir,
                 req.Turn == "Left" ? TurnSide.Left : TurnSide.Right,
                 req.Speed ?? 1f),
+            ComponentKinds.MergeLogic => new PlaceMergeLogicCommand(
+                pos,
+                dir,
+                req.Mode == "priority" ? MergeMode.Priority : MergeMode.Alternating,
+                req.Speed ?? 1f),
             _ => null,
         };
 
@@ -190,4 +195,5 @@ public sealed record PlaceComponentRequest(
     float?  Weight    = null,
     float?  Size      = null,
     string? Turn      = null,
-    float?  Speed     = null);
+    float?  Speed     = null,
+    string? Mode      = null);
