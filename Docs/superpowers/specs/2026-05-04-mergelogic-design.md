@@ -21,6 +21,11 @@
 | `Sources/Stockflow.Simulation/Component/MergeLogic.cs` | Nuovo |
 | `Sources/Stockflow.Simulation/Component/MergeMode.cs` | Nuovo |
 | `Sources/Stockflow.Simulation/Component/ComponentType.cs` | Aggiunta voce `MergeLogic` |
+| `Sources/Stockflow.Simulation/Commands/PlaceComponentCommand.cs` | Aggiunta `PlaceMergeLogicCommand` |
+| `Sources/Stockflow.Simulation/Core/SimulationEngine.cs` | Factory + branch `ConfigureComponent` |
+| `Sources/Stockflow.Protocol/Messages/SharedTypes.cs` | Aggiunta `ComponentKinds.MergeLogic` |
+| `Sources/Stockflow.Webserver/Controllers/SimulationController.cs` | Case `merge` in `PlaceComponent` + `Mode` in request |
+| `Sources/Stockflow.Webserver/Serialization/ComponentSerializer.cs` | `KindString` + `BuildProperties` per MergeLogic |
 | `Sources/Stockflow.Tests.Simulation/MergeLogicTests.cs` | Nuovo |
 
 ---
@@ -94,7 +99,7 @@ Se due upstream conveyors chiamano `TryAccept` nello stesso tick, il primo vince
 
 ---
 
-## 5. Test plan
+## 5. Test plan (simulazione)
 
 | Test | Comportamento verificato |
 |---|---|
@@ -111,10 +116,111 @@ Se due upstream conveyors chiamano `TryAccept` nello stesso tick, il primo vince
 | `Tick_NoNext_EntityStays` | Nessun downstream → entità rimane (jam) |
 | `StallTicks_ResetOnAccept` | `_stallTicks` azzerato ad ogni accettazione |
 
+| `SetFacing_RebuildsPortsAndReconnects` | `SetFacing` aggiorna posizioni porte e riconnette |
+
 ---
 
-## 6. Vincoli architetturali
+## 6. Layer command (Simulation)
+
+### 6.1 PlaceMergeLogicCommand
+
+```csharp
+public sealed record PlaceMergeLogicCommand(
+    GridCoord  Position,
+    Direction  Facing,
+    MergeMode  Mode  = MergeMode.Alternating,
+    float      Speed = 1f
+) : ICommand;
+```
+
+Registrata nella factory di `SimulationEngine` esattamente come gli altri `PlaceXxxCommand`.
+
+### 6.2 ConfigureComponent — branch MergeLogic
+
+Aggiunto a `SimulationEngine.ConfigureComponent`:
+
+```
+if component is MergeLogic merge:
+    "mode"   → parse "alternating"|"priority" → merge.Mode
+    "speed"  → parse float > 0 → merge.Speed
+    "facing" → parse Direction →
+                  Graph.DisconnectAll(merge)
+                  merge.SetFacing(newDir)
+                  AutoConnect(merge)
+    return Ok()
+```
+
+### 6.3 MergeLogic.SetFacing(Direction)
+
+Metodo pubblico su `MergeLogic` che ricostruisce le tre porte (`_inPort0`, `_inPort1`, `_outPort`) e aggiorna la proprietà `Facing`. Necessario perché le posizioni delle porte derivano da `Facing` e sono calcolate nel costruttore; il cambio a runtime richiede una ricostruzione esplicita.
+
+Dopo la chiamata, `SimulationEngine` invoca `AutoConnect(merge)` per ristabilire le connessioni con i nuovi vicini.
+
+---
+
+## 7. Layer controller (Webserver)
+
+### 7.1 ComponentKinds
+
+```csharp
+// SharedTypes.cs
+public const string MergeLogic = "merge";
+```
+
+Il valore `"merge"` è già usato dal frontend Angular (`sim-mock.ts`) — wire-stable.
+
+### 7.2 PlaceComponentRequest
+
+Aggiunto parametro opzionale:
+
+```csharp
+string? Mode = null   // "alternating" | "priority"
+```
+
+### 7.3 SimulationController — case merge
+
+```csharp
+ComponentKinds.MergeLogic => new PlaceMergeLogicCommand(
+    pos,
+    dir,
+    req.Mode == "priority" ? MergeMode.Priority : MergeMode.Alternating,
+    req.Speed ?? 1f),
+```
+
+### 7.4 ComponentSerializer
+
+**KindString:**
+```csharp
+SimComponentType.MergeLogic => ComponentKinds.MergeLogic,
+```
+
+**BuildProperties:**
+```csharp
+MergeLogic m => new()
+{
+    ["mode"]  = m.Mode == MergeMode.Priority ? "priority" : "alternating",
+    ["speed"] = m.Speed.ToString("F3"),
+},
+```
+
+`Facing` non va in `Properties` — è già esposto come campo top-level di `ComponentState`.
+
+### 7.5 Flusso configurazione runtime (frontend → simulazione)
+
+```
+PUT /api/sim/components/{id}
+    body: { "mode": "priority" }          → cambia logica merge
+    body: { "speed": "2.0" }              → cambia velocità
+    body: { "facing": "East" }            → ruota uscita, riconnette porte
+```
+
+Tutti e tre i casi passano per l'esistente `ConfigureComponentCommand` — nessun nuovo endpoint REST necessario.
+
+---
+
+## 9. Vincoli architetturali
 
 - `Stockflow.Simulation` deve rimanere **zero dipendenze NuGet** — nessuna dipendenza esterna introdotta
 - `MergeLogic` segue esattamente lo stesso pattern di `OneWayConveyor` e `ConveyorTurn`
 - Il campo `Occupant` esposto da `ISimComponent` rappresenta l'entità in transito (progress 0→1), non un buffer
+- `SetFacing` è chiamato **solo** dal `SimulationEngine` (dentro il tick lock, via `ConfigureComponent`), mai direttamente da codice client
