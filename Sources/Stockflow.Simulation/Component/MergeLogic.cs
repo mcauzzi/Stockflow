@@ -21,10 +21,14 @@ public class MergeLogic : ISimComponent
     private Port   _inPort0;
     private Port   _inPort1;
     private Port   _outPort;
-    private Port[] _ports = null!;
+    private Port[] _ports = [];
     private PortId _activePort;
     private int    _stallTicks;
     private const int StallThreshold = 30;
+
+    private static readonly PortId _port0 = new(0);
+    private static readonly PortId _port1 = new(1);
+    private static readonly PortId _port2 = new(2);
 
     public MergeLogic(int id, GridCoord position, Direction facing, MergeMode mode, float speed,
                       RoutingGraph graph, IReadOnlyList<IComponentModule>? modules = null)
@@ -35,45 +39,44 @@ public class MergeLogic : ISimComponent
         Speed       = speed;
         Graph       = graph;
         Modules     = modules ?? [];
-        _activePort = new PortId(0);
+        _activePort = _port0;
         SetFacing(facing);
     }
 
     public void SetFacing(Direction facing)
     {
         Facing   = facing;
-        _inPort0 = new(new PortId(0), Position + facing.Opposite().ToOffset(),  PortDirection.In);
-        _inPort1 = new(new PortId(1), Position + facing.RotateCCW().ToOffset(), PortDirection.In);
-        _outPort = new(new PortId(2), Position + facing.ToOffset(),             PortDirection.Out);
+        _inPort0 = new(_port0, Position + facing.Opposite().ToOffset(),  PortDirection.In);
+        _inPort1 = new(_port1, Position + facing.RotateCCW().ToOffset(), PortDirection.In);
+        _outPort = new(_port2, Position + facing.ToOffset(),             PortDirection.Out);
         _ports   = [_inPort0, _inPort1, _outPort];
     }
 
     public void Tick(float deltaTime)
     {
-        if (Occupant != null)
-        {
-            if (Occupant.Progress < 1.0f)
-            {
-                Occupant.Progress += Speed * deltaTime;
-            }
-            else
-            {
-                var next = Graph.GetNext(this, _outPort.Id);
-                if (next != null && next.Value.To.TryAccept(Occupant, next.Value.ToPort))
-                {
-                    foreach (var module in Modules)
-                        module.OnEntityExit(Occupant);
-                    Occupant = null;
-                }
-            }
-        }
-        else
+        if (Occupant == null)
         {
             _stallTicks++;
             if (_stallTicks >= StallThreshold)
             {
-                _activePort = _activePort == new PortId(0) ? new PortId(1) : new PortId(0);
+                _activePort = _activePort == _port0 ? _port1 : _port0;
                 _stallTicks = 0;
+            }
+            return;
+        }
+
+        if (Occupant.Progress < 1.0f)
+        {
+            Occupant.Progress += Speed * deltaTime;
+        }
+        else
+        {
+            var next = Graph.GetNext(this, _outPort.Id);
+            if (next != null && next.Value.To.TryAccept(Occupant, next.Value.ToPort))
+            {
+                foreach (var module in Modules)
+                    module.OnEntityExit(Occupant);
+                Occupant = null;
             }
         }
     }
@@ -90,9 +93,9 @@ public class MergeLogic : ISimComponent
         _stallTicks             = 0;
 
         if (Mode == MergeMode.Alternating)
-            _activePort = _activePort == new PortId(0) ? new PortId(1) : new PortId(0);
+            _activePort = _activePort == _port0 ? _port1 : _port0;
         else
-            _activePort = new PortId(0);
+            _activePort = _port0;
 
         foreach (var module in Modules)
             module.OnEntityEnter(entity);
