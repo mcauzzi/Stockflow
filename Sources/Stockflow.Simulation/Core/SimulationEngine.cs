@@ -45,6 +45,11 @@ public class SimulationEngine
                 var x = (PlacePackageExitCommand)c;
                 return new PackageExit(id, x.Position, x.Facing, State.Entities);
             },
+            [typeof(PlaceMergeLogicCommand)] = (c, id) =>
+            {
+                var x = (PlaceMergeLogicCommand)c;
+                return new MergeLogic(id, x.Position, x.Facing, x.Mode, x.Speed, Graph);
+            },
         };
     }
 
@@ -144,6 +149,21 @@ public class SimulationEngine
         {
             if (cmd.Properties.TryGetValue("speed", out var sp) && float.TryParse(sp, out var speed) && speed > 0)
                 turn.Speed = speed;
+            return CommandResult.Ok();
+        }
+        if (component is MergeLogic merge)
+        {
+            if (cmd.Properties.TryGetValue("mode", out var modeStr))
+                merge.Mode = modeStr == "priority" ? MergeMode.Priority : MergeMode.Alternating;
+            if (cmd.Properties.TryGetValue("speed", out var sp) && float.TryParse(sp, out var speed) && speed > 0)
+                merge.Speed = speed;
+            if (cmd.Properties.TryGetValue("facing", out var facingStr) &&
+                Enum.TryParse<Direction>(facingStr, out var newDir))
+            {
+                Graph.DisconnectAll(merge);
+                merge.SetFacing(newDir);
+                AutoConnect(merge);
+            }
             return CommandResult.Ok();
         }
         return component is null
