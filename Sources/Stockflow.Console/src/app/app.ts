@@ -44,6 +44,7 @@ export class App implements OnInit {
   readonly placeFacing    = signal<Direction>('North');
   readonly placeTurnSide  = signal<'Left' | 'Right'>('Right');
   readonly placeSpeed     = signal(1);
+  readonly placeMergeMode = signal<'alternating' | 'priority'>('alternating');
   readonly paused         = signal(false);
   readonly currentSpeed   = signal<SimSpeed>(1);
 
@@ -105,6 +106,10 @@ export class App implements OnInit {
     this.placeSpeed.set(speed);
   }
 
+  onPlaceMergeModeChange(mode: 'alternating' | 'priority'): void {
+    this.placeMergeMode.set(mode);
+  }
+
   @HostListener('document:keydown.escape')
   onEscape(): void {
     this.selectedTool.set(null);
@@ -117,6 +122,7 @@ export class App implements OnInit {
     const params: Record<string, unknown> = {};
     if (kind === 'conveyor_turn') params['turn'] = this.placeTurnSide();
     if (kind === 'conveyor_oneway' || kind === 'conveyor_turn') params['speed'] = this.placeSpeed();
+    if (kind === 'merge') { params['speed'] = this.placeSpeed(); params['mode'] = this.placeMergeMode(); }
     this.sim.placeComponent(kind, cell.x, cell.y, this.placeFacing(),
       Object.keys(params).length ? params as any : undefined);
   }

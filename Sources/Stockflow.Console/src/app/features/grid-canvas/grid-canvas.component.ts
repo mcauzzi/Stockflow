@@ -161,6 +161,27 @@ const FLOORS = [
                     text-anchor="middle" letter-spacing="0.03em" opacity="0.8">EXIT</text>
             </ng-container>
 
+            <!-- Merge Logic: primary input from left, secondary from top, output to right (East base) -->
+            <ng-container *ngSwitchCase="'merge'">
+              <rect x="1" y="1" [attr.width]="CELL-2" [attr.height]="CELL-2"
+                    fill="#0f1e28"
+                    [attr.stroke]="c.id === selectedId ? '#f5a623' : '#0e7490'"
+                    [attr.stroke-width]="c.id === selectedId ? 1.5 : 1"/>
+              <g [attr.transform]="'rotate('+facingRot(c.facing)+' '+CELL/2+' '+CELL/2+')'">
+                <line x1="3" [attr.y1]="CELL/2" [attr.x2]="CELL/2-1" [attr.y2]="CELL/2"
+                      stroke="#38bdf8" stroke-width="1.2"/>
+                <line [attr.x1]="CELL/2" y1="3" [attr.x2]="CELL/2" [attr.y2]="CELL/2-1"
+                      stroke="#38bdf8" stroke-width="1.2" opacity="0.65"/>
+                <line [attr.x1]="CELL/2+2" [attr.y1]="CELL/2" [attr.x2]="CELL-7" [attr.y2]="CELL/2"
+                      stroke="#38bdf8" stroke-width="1.2"/>
+                <polygon [attr.points]="arrowPtsMerge()" fill="#38bdf8"/>
+                <circle [attr.cx]="CELL/2" [attr.cy]="CELL/2" r="1.8" fill="#38bdf8" opacity="0.9"/>
+              </g>
+              <text [attr.x]="CELL/2" y="7"
+                    font-size="5" fill="#38bdf8" font-family="JetBrains Mono,monospace"
+                    text-anchor="middle" opacity="0.7">MRG</text>
+            </ng-container>
+
             <ng-container *ngSwitchDefault>
               <rect x="1" y="1" [attr.width]="CELL-2" [attr.height]="CELL-2"
                     fill="#181d24"
@@ -310,6 +331,7 @@ export class GridCanvasComponent implements OnChanges {
     if (!this.activeTool) return '#f5a623';
     return this.activeTool.kind === 'package_generator' ? '#4ade80'
          : this.activeTool.kind === 'package_exit'      ? '#f87171'
+         : this.activeTool.kind === 'merge'             ? '#38bdf8'
          : '#f5a623';
   }
 
@@ -317,6 +339,7 @@ export class GridCanvasComponent implements OnChanges {
     if (!this.activeTool) return 'rgba(245,166,35,.07)';
     return this.activeTool.kind === 'package_generator' ? 'rgba(74,222,128,.15)'
          : this.activeTool.kind === 'package_exit'      ? 'rgba(248,113,113,.15)'
+         : this.activeTool.kind === 'merge'             ? 'rgba(56,189,248,.15)'
          : 'rgba(245,166,35,.07)';
   }
 
@@ -410,11 +433,17 @@ export class GridCanvasComponent implements OnChanges {
     return `${x2-5},${y-3.5} ${x2},${y} ${x2-5},${y+3.5}`;
   }
 
+  arrowPtsMerge(): string {
+    const x2 = CELL - 5, y = CELL / 2;
+    return `${x2-5},${y-3} ${x2},${y} ${x2-5},${y+3}`;
+  }
+
   kindColor(kind: string): string {
     return kind === 'conveyor_oneway'   ? '#4ade80'
          : kind === 'conveyor_turn'     ? '#22d3ee'
          : kind === 'package_generator' ? '#86efac'
          : kind === 'package_exit'      ? '#fca5a5'
+         : kind === 'merge'             ? '#38bdf8'
          : '#3d4652';
   }
 

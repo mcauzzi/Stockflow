@@ -135,8 +135,33 @@ const KIND_LABELS: Record<string, string> = {
           </div>
         </ng-container>
 
+        <!-- ── MERGE LOGIC ──────────────────────────────── -->
+        <ng-container *ngIf="isMerge">
+          <div class="panel-head"><span>CONFIG</span></div>
+          <div class="sec form-sec">
+            <div class="field">
+              <label class="field-lbl">MODE</label>
+              <div class="facing-btns">
+                <button class="dbtn" [class.on]="editMergeMode === 'alternating'" (click)="editMergeMode = 'alternating'">ALTERNATING</button>
+                <button class="dbtn" [class.on]="editMergeMode === 'priority'"    (click)="editMergeMode = 'priority'">PRIORITY</button>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-lbl">Speed <span class="unit">cell/s</span></label>
+              <input class="field-input" type="number" [(ngModel)]="editMergeSpeed"
+                     min="0.1" max="10" step="0.1"/>
+            </div>
+            <button class="save-btn" (click)="saveMerge()">APPLY CHANGES</button>
+          </div>
+          <div class="panel-head"><span>PROPERTIES</span></div>
+          <div class="sec">
+            <div class="row"><div class="k">Grid</div><div class="v">({{ selected.gridX }}, {{ selected.gridY }})</div></div>
+            <div class="row"><div class="k">Facing</div><div class="v">{{ selected.facing }}</div></div>
+          </div>
+        </ng-container>
+
         <!-- ── OTHER COMPONENTS ──────────────────────────── -->
-        <ng-container *ngIf="!isGenerator && !isExit && !isConveyor">
+        <ng-container *ngIf="!isGenerator && !isExit && !isConveyor && !isMerge">
           <div class="panel-head"><span>PROPERTIES</span></div>
           <div class="sec">
             <div class="row"><div class="k">Kind</div><div class="v">{{ selected.kind }}</div></div>
@@ -253,6 +278,23 @@ const KIND_LABELS: Record<string, string> = {
     }
     .del-btn:hover { background: rgba(248,113,113,.16); }
 
+    /* Merge mode buttons */
+    .facing-btns { display: flex; gap: 3px; }
+    .dbtn {
+      flex: 1;
+      padding: 4px 0;
+      border: 1px solid var(--border-bright);
+      background: transparent;
+      color: var(--text-3);
+      font-family: var(--mono);
+      font-size: 9px;
+      cursor: pointer;
+      letter-spacing: .04em;
+      transition: all .1s;
+    }
+    .dbtn.on { color: var(--cyan); border-color: var(--cyan-dim); background: rgba(34,211,238,.06); font-weight: 700; }
+    .dbtn:hover:not(.on) { background: var(--bg-2); color: var(--text-1); }
+
     /* Exit metrics */
     .metrics-sec { display: flex; flex-direction: column; gap: 6px; }
     .metric-card {
@@ -281,10 +323,12 @@ export class InspectorComponent implements OnChanges {
 
   private sim = inject(SimStateService);
 
-  editSpawnRate = 1;
-  editSku = 'PKG';
-  editEnabled = true;
-  editSpeed = 1;
+  editSpawnRate  = 1;
+  editSku        = 'PKG';
+  editEnabled    = true;
+  editSpeed      = 1;
+  editMergeMode: 'alternating' | 'priority' = 'alternating';
+  editMergeSpeed = 1;
 
   get kindLabel(): string {
     return this.selected ? (KIND_LABELS[this.selected.kind] ?? this.selected.kind.toUpperCase()) : '';
@@ -292,6 +336,7 @@ export class InspectorComponent implements OnChanges {
 
   get isGenerator(): boolean { return this.selected?.kind === 'package_generator'; }
   get isExit():      boolean { return this.selected?.kind === 'package_exit'; }
+  get isMerge():     boolean { return this.selected?.kind === 'merge'; }
   get isConveyor():  boolean {
     return this.selected?.kind === 'conveyor_oneway' || this.selected?.kind === 'conveyor_turn';
   }
@@ -305,6 +350,10 @@ export class InspectorComponent implements OnChanges {
     }
     if (this.isConveyor) {
       this.editSpeed = parseFloat(p['speed'] ?? '1');
+    }
+    if (this.isMerge) {
+      this.editMergeMode  = (p['mode'] ?? 'alternating') as 'alternating' | 'priority';
+      this.editMergeSpeed = parseFloat(p['speed'] ?? '1');
     }
   }
 
@@ -324,6 +373,14 @@ export class InspectorComponent implements OnChanges {
   saveConveyor(): void {
     if (!this.selected) return;
     this.sim.configureComponent(this.selected.id, { speed: String(this.editSpeed) });
+  }
+
+  saveMerge(): void {
+    if (!this.selected) return;
+    this.sim.configureComponent(this.selected.id, {
+      mode:  this.editMergeMode,
+      speed: String(this.editMergeSpeed),
+    });
   }
 
   deleteComponent(): void {
