@@ -181,6 +181,32 @@ public sealed class SimulationController(
         return Accepted();
     }
 
+    // ── GET /api/sim/schemas ──────────────────────────────────────────────────
+    /// <summary>
+    /// Returns the ConfigSchema for each registered component kind.
+    /// The frontend uses this to generate inspector forms dynamically.
+    /// </summary>
+    [HttpGet("schemas")]
+    public IActionResult GetSchemas()
+    {
+        var registry = ComponentSchemaRegistry.GetAll();
+        return Ok(registry.Select(kv => new
+        {
+            kind   = kv.Key,
+            schema = kv.Value.Select(s => new
+            {
+                key          = s.Key,
+                displayName  = s.DisplayName,
+                type         = s.Type.ToString().ToLowerInvariant(),
+                defaultValue = s.DefaultValue,
+                min          = s.Min,
+                max          = s.Max,
+                enumValues   = s.EnumValues,
+                isReadOnly   = s.IsReadOnly,
+            }),
+        }));
+    }
+
 }
 
 public sealed record ChangeSpeedRequest(int Speed);
