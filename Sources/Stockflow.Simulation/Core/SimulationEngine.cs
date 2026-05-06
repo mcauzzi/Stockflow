@@ -125,50 +125,36 @@ public class SimulationEngine
     private CommandResult ConfigureComponent(ConfigureComponentCommand cmd)
     {
         var component = State.Components.Find(c => c.Id == cmd.ComponentId);
-        if (component is PackageGenerator gen)
+        if (component is null)
+            return CommandResult.Fail($"Component {cmd.ComponentId} not found");
+
+        // --- Special case: facing change requires RoutingGraph surgery ---
+        if (cmd.Properties.TryGetValue("facing", out var facingStr) &&
+            Enum.TryParse<Direction>(facingStr, ignoreCase: true, out var newDir) &&
+            newDir != component.Facing)
         {
-            if (cmd.Properties.TryGetValue("spawnRate", out var sr) && float.TryParse(sr, out var rate))
-                gen.SpawnRate = rate;
-            if (cmd.Properties.TryGetValue("sku", out var sku))
-                gen.Sku = sku;
-            if (cmd.Properties.TryGetValue("weight", out var wStr) && float.TryParse(wStr, out var w))
-                gen.Weight = w;
-            if (cmd.Properties.TryGetValue("size", out var sStr) && float.TryParse(sStr, out var s))
-                gen.Size = s;
-            if (cmd.Properties.TryGetValue("enabled", out var en) && bool.TryParse(en, out var enabled))
-                gen.IsEnabled = enabled;
-            return CommandResult.Ok();
-        }
-        if (component is OneWayConveyor conv)
-        {
-            if (cmd.Properties.TryGetValue("speed", out var sp) && float.TryParse(sp, out var speed) && speed > 0)
-                conv.Speed = speed;
-            return CommandResult.Ok();
-        }
-        if (component is ConveyorTurn turn)
-        {
-            if (cmd.Properties.TryGetValue("speed", out var sp) && float.TryParse(sp, out var speed) && speed > 0)
-                turn.Speed = speed;
-            return CommandResult.Ok();
-        }
-        if (component is MergeLogic merge)
-        {
-            if (cmd.Properties.TryGetValue("mode", out var modeStr))
-                merge.Mode = modeStr == "priority" ? MergeMode.Priority : MergeMode.Alternating;
-            if (cmd.Properties.TryGetValue("speed", out var sp) && float.TryParse(sp, out var speed) && speed > 0)
-                merge.Speed = speed;
-            if (cmd.Properties.TryGetValue("facing", out var facingStr) &&
-                Enum.TryParse<Direction>(facingStr, out var newDir))
+            switch (component)
             {
-                Graph.DisconnectAll(merge);
-                merge.SetFacing(newDir);
-                AutoConnect(merge);
+                case MergeLogic merge:
+                    Graph.DisconnectAll(merge);
+                    merge.SetFacing(newDir);
+                    AutoConnect(merge);
+                    break;
+                default:
+                    return CommandResult.Fail($"Component type {component.Type} does not support runtime facing change");
             }
-            return CommandResult.Ok();
         }
-        return component is null
-            ? CommandResult.Fail($"Component {cmd.ComponentId} not found")
-            : CommandResult.Fail($"Component {cmd.ComponentId} ({component.Type}) is not configurable");
+
+        // --- Generic schema-driven config for all other properties ---
+        var propsToApply = cmd.Properties
+            .Where(kv => kv.Key != "facing")
+            .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+        if (propsToApply.Count == 0)
+            return CommandResult.Ok();
+
+        var error = component.ApplyConfig(propsToApply);
+        return error is null ? CommandResult.Ok() : CommandResult.Fail(error);
     }
 
     private CommandResult RemoveComponent(RemoveComponentCommand cmd)
