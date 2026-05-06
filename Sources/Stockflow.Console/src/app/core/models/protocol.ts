@@ -77,3 +77,19 @@ export interface CommandResultMessage {
 }
 
 export type ServerMessage = StateDeltaMessage | FullStateMessage | CommandResultMessage;
+
+export interface PropertySchema {
+  key:          string;
+  displayName:  string;
+  type:         'float' | 'int' | 'string' | 'bool' | 'enum';
+  defaultValue: string | null;
+  min:          string | null;
+  max:          string | null;
+  enumValues:   string[] | null;
+  isReadOnly:   boolean;
+}
+
+export interface ComponentSchemaEntry {
+  kind:   string;
+  schema: PropertySchema[];
+}

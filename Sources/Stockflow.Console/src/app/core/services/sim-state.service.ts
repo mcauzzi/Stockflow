@@ -2,6 +2,7 @@ import { Injectable, OnDestroy, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { WebSocketService } from './websocket.service';
+import { SchemaService } from './schema.service';
 import {
   ComponentState, Direction, EntityState, MetricsSnapshot, SimEvent, SimSpeed,
   StateDeltaMessage, FullStateMessage,
@@ -55,6 +56,7 @@ export class SimStateService implements OnDestroy {
   constructor(
     private ws: WebSocketService,
     private http: HttpClient,
+    private schemas: SchemaService,
   ) {
     this._init();
   }
@@ -135,6 +137,7 @@ export class SimStateService implements OnDestroy {
       next: () => {
         this.restOnline.set(true);
         this._loadInitialState();
+        this.schemas.load();
       },
       error: () => {
         this.restOnline.set(false);
