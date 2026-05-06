@@ -153,6 +153,10 @@ public class SimulationEngine
         if (propsToApply.Count == 0)
             return CommandResult.Ok();
 
+        // Components with no writable properties (e.g. PackageExit) are not configurable.
+        if (!component.ConfigSchema.Any(s => !s.IsReadOnly))
+            return CommandResult.Fail($"Component type {component.Type} has no configurable properties");
+
         var error = component.ApplyConfig(propsToApply);
         return error is null ? CommandResult.Ok() : CommandResult.Fail(error);
     }

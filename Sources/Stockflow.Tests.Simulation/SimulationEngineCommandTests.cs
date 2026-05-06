@@ -147,17 +147,17 @@ public class SimulationEngineCommandTests
     }
 
     [Fact]
-    public void ConfigurePackageExit_UnknownProps_ReturnsOk()
+    public void ConfigurePackageExit_ReturnsFail()
     {
         var engine = MakeEngine();
         engine.ProcessCommand(new PlacePackageExitCommand(new GridCoord(0, 0), Direction.North));
         var id = engine.State.Components[0].Id;
 
-        // Unknown properties are silently ignored — schema-driven ApplyConfig returns null (success)
+        // PackageExit has no configurable parameters — unknown keys are rejected
         var result = engine.ProcessCommand(new ConfigureComponentCommand(id,
             new Dictionary<string, string> { ["anything"] = "1" }));
 
-        Assert.True(result.Success);
+        Assert.False(result.Success);
     }
 
     // ── Auto-connect ──────────────────────────────────────────────────────
