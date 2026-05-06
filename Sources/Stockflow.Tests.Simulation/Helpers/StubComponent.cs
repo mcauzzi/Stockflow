@@ -16,6 +16,10 @@ internal sealed class StubComponent(int id = 0, GridCoord position = default) : 
     public IReadOnlyList<Port>             Ports    => [];
     public int                             TickCount { get; private set; }
 
+    public IReadOnlyList<PropertySchema>          ConfigSchema      => [];
+    public string?                                ApplyConfig(IReadOnlyDictionary<string, string> properties) => null;
+    public Dictionary<string, string>             ExportProperties() => [];
+
     public void Tick(float deltaTime) => TickCount++;
 
     public bool TryAccept(SimEntity entity, PortId fromPort)

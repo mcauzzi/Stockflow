@@ -17,7 +17,7 @@ public class ConveyorTurn : ISimComponent
     private Port                            OutPort  { get; }
     public  IReadOnlyList<Port>             Ports    { get; }
     public  float                           Speed    { get; set; }
-    public  TurnSide                        Turn     { get; }
+    public  TurnSide                        Turn     { get; set; }
     public  RoutingGraph                    Graph    { get; }
 
     public ConveyorTurn(int id, GridCoord position, Direction facing, TurnSide turn, float speed,
@@ -36,6 +36,46 @@ public class ConveyorTurn : ISimComponent
         OutPort = new(new(1), Position + exitFacing.ToOffset(),        PortDirection.Out);
         Ports   = [InPort, OutPort];
     }
+
+    // --- ConfigSchema ---
+
+    public static readonly PropertySchema[] Schema =
+    [
+        new("speed", "Speed (m/s)", PropertyType.Float, DefaultValue: "1",     Min: "0.01", Max: "10"),
+        new("turn",  "Turn Side",   PropertyType.Enum,  DefaultValue: "right", EnumValues: ["left", "right"]),
+    ];
+
+    public IReadOnlyList<PropertySchema> ConfigSchema => Schema;
+
+    public string? ApplyConfig(IReadOnlyDictionary<string, string> properties)
+    {
+        foreach (var (key, value) in properties)
+        {
+            var schema = Schema.FirstOrDefault(s => s.Key == key);
+            if (schema is null || schema.IsReadOnly) continue;
+
+            var error = schema.Validate(value);
+            if (error is not null) return error;
+
+            switch (key)
+            {
+                case "speed":
+                    Speed = float.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+                    break;
+                case "turn":
+                    Turn = value.Equals("left", StringComparison.OrdinalIgnoreCase)
+                               ? TurnSide.Left : TurnSide.Right;
+                    break;
+            }
+        }
+        return null;
+    }
+
+    public Dictionary<string, string> ExportProperties() => new()
+    {
+        ["speed"] = Speed.ToString("F3"),
+        ["turn"]  = Turn == TurnSide.Right ? "right" : "left",
+    };
 
     public void Tick(float deltaTime)
     {

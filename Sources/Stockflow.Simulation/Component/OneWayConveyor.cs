@@ -33,6 +33,36 @@ public class OneWayConveyor : ISimComponent
         Ports    = [InPort, OutPort];
     }
 
+    // --- ConfigSchema ---
+
+    public static readonly PropertySchema[] Schema =
+    [
+        new("speed", "Speed (m/s)", PropertyType.Float, DefaultValue: "1", Min: "0.01", Max: "10"),
+    ];
+
+    public IReadOnlyList<PropertySchema> ConfigSchema => Schema;
+
+    public string? ApplyConfig(IReadOnlyDictionary<string, string> properties)
+    {
+        foreach (var (key, value) in properties)
+        {
+            var schema = Schema.FirstOrDefault(s => s.Key == key);
+            if (schema is null || schema.IsReadOnly) continue;
+
+            var error = schema.Validate(value);
+            if (error is not null) return error;
+
+            if (key == "speed")
+                Speed = float.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        }
+        return null;
+    }
+
+    public Dictionary<string, string> ExportProperties() => new()
+    {
+        ["speed"] = Speed.ToString("F3"),
+    };
+
     public void Tick(float deltaTime)
     {
         if (Occupant == null) return;

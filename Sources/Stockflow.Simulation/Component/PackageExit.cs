@@ -49,6 +49,30 @@ public class PackageExit : ISimComponent
         Ports     = [_inPort];
     }
 
+    // --- ConfigSchema ---
+
+    public static readonly PropertySchema[] Schema =
+    [
+        new("totalProcessed",     "Total Processed",         PropertyType.Int,   IsReadOnly: true),
+        new("throughput",         "Throughput (pcs/s)",       PropertyType.Float, IsReadOnly: true),
+        new("avgFulfillmentTime", "Avg Fulfillment Time (s)", PropertyType.Float, IsReadOnly: true),
+    ];
+
+    public IReadOnlyList<PropertySchema> ConfigSchema => Schema;
+
+    public string? ApplyConfig(IReadOnlyDictionary<string, string> properties)
+    {
+        // PackageExit has no writable properties — all are computed metrics.
+        return null;
+    }
+
+    public Dictionary<string, string> ExportProperties() => new()
+    {
+        ["totalProcessed"]     = TotalProcessed.ToString(),
+        ["throughput"]         = Throughput.ToString("F3"),
+        ["avgFulfillmentTime"] = AvgFulfillmentTime.ToString("F3"),
+    };
+
     public void Tick(float deltaTime)
     {
         _simTime += deltaTime;

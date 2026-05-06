@@ -52,6 +52,60 @@ public class PackageGenerator : ISimComponent
         Ports     = [_outPort];
     }
 
+    // --- ConfigSchema ---
+
+    public static readonly PropertySchema[] Schema =
+    [
+        new("spawnRate", "Spawn Rate (pcs/s)", PropertyType.Float,  DefaultValue: "1",    Min: "0.01", Max: "100"),
+        new("sku",       "SKU",                PropertyType.String, DefaultValue: "PKG"),
+        new("weight",    "Weight (kg)",        PropertyType.Float,  DefaultValue: "1",    Min: "0.01", Max: "1000"),
+        new("size",      "Size",               PropertyType.Float,  DefaultValue: "1",    Min: "0.01", Max: "10"),
+        new("enabled",   "Enabled",            PropertyType.Bool,   DefaultValue: "true"),
+    ];
+
+    public IReadOnlyList<PropertySchema> ConfigSchema => Schema;
+
+    public string? ApplyConfig(IReadOnlyDictionary<string, string> properties)
+    {
+        foreach (var (key, value) in properties)
+        {
+            var schema = Schema.FirstOrDefault(s => s.Key == key);
+            if (schema is null || schema.IsReadOnly) continue;
+
+            var error = schema.Validate(value);
+            if (error is not null) return error;
+
+            switch (key)
+            {
+                case "spawnRate":
+                    SpawnRate = float.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+                    break;
+                case "sku":
+                    Sku = value;
+                    break;
+                case "weight":
+                    Weight = float.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+                    break;
+                case "size":
+                    Size = float.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+                    break;
+                case "enabled":
+                    IsEnabled = bool.Parse(value);
+                    break;
+            }
+        }
+        return null;
+    }
+
+    public Dictionary<string, string> ExportProperties() => new()
+    {
+        ["spawnRate"] = SpawnRate.ToString("F3"),
+        ["sku"]       = Sku,
+        ["weight"]    = Weight.ToString("F3"),
+        ["size"]      = Size.ToString("F3"),
+        ["enabled"]   = IsEnabled ? "true" : "false",
+    };
+
     public void Tick(float deltaTime)
     {
         _simTime += deltaTime;
