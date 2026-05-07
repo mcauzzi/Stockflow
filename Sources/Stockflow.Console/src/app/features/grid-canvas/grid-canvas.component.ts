@@ -78,7 +78,7 @@ const FLOORS = [
                 [attr.x]="c.gridX" [attr.y]="c.gridY" width="1" height="1"
                 [attr.fill]="kindColor(c.kind)"/>
         </svg>
-        <div class="ovl-info hint">Scroll · Zoom &nbsp; Drag · Pan</div>
+        <div class="ovl-info hint">Scroll · Zoom &nbsp; Mid-drag · Pan</div>
       </div>
 
       <!-- Main SVG — no viewBox, pan/zoom via inner <g> transform -->
@@ -454,8 +454,8 @@ export class GridCanvasComponent implements OnChanges, AfterViewInit, OnDestroy 
   }
 
   onMouseDown(e: MouseEvent): void {
-    if (e.button === 0 || e.button === 1) {
-      if (e.button === 1) e.preventDefault();
+    if (e.button === 1) {
+      e.preventDefault();
       this.isPanning = true;
       this.didPan = false;
       this.panStart = { x: e.clientX, y: e.clientY, panX: this.panX, panY: this.panY };
