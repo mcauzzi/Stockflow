@@ -1,7 +1,6 @@
 import {
   Component, Input, Output, EventEmitter,
-  ElementRef, ViewChild, OnChanges, AfterViewInit, OnDestroy,
-  HostListener, NgZone,
+  ElementRef, ViewChild, OnChanges, AfterViewInit, OnDestroy, NgZone,
 } from '@angular/core';
 import { NgFor, NgIf, NgSwitch, NgSwitchCase, NgSwitchDefault } from '@angular/common';
 import { ComponentState, EntityState, Direction } from '../../core/models/protocol';
@@ -90,9 +89,9 @@ const FLOORS = [
            (mousedown)="onMouseDown($event)"
            (mousemove)="onMouseMove($event)"
            (mouseleave)="onMouseLeave()"
-           (mouseup)="onMouseUp($event)"
+           (mouseup)="onMouseUp()"
            (contextmenu)="$event.preventDefault()"
-           (click)="onSvgClick($event)">
+           (click)="onSvgClick()">
 
         <g [attr.transform]="canvasTransform">
 
@@ -364,7 +363,6 @@ export class GridCanvasComponent implements OnChanges, AfterViewInit, OnDestroy 
   private isPanning = false;
   private didPan = false;
   private panStart = { x: 0, y: 0, panX: 0, panY: 0 };
-  private spaceDown = false;
   private wheelListener!: (e: WheelEvent) => void;
 
   get svgW() { return this.cols * CELL; }
@@ -417,13 +415,7 @@ export class GridCanvasComponent implements OnChanges, AfterViewInit, OnDestroy 
         const svg = this.svgEl?.nativeElement;
         if (!svg) return;
         const rect = svg.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
-        const factor = e.deltaY > 0 ? 0.85 : 1 / 0.85;
-        const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, this.zoom * factor));
-        this.panX = mx - (mx - this.panX) * (newZoom / this.zoom);
-        this.panY = my - (my - this.panY) * (newZoom / this.zoom);
-        this.zoom = newZoom;
+        this.applyZoom(e.deltaY > 0 ? 0.85 : 1 / 0.85, e.clientX - rect.left, e.clientY - rect.top);
       });
     };
     this.svgEl.nativeElement.addEventListener('wheel', this.wheelListener, { passive: false });
@@ -451,9 +443,10 @@ export class GridCanvasComponent implements OnChanges, AfterViewInit, OnDestroy 
     const svg = this.svgEl?.nativeElement;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
-    const mx = rect.width / 2;
-    const my = rect.height / 2;
-    const factor = dir > 0 ? 1.25 : 0.8;
+    this.applyZoom(dir > 0 ? 1.25 : 0.8, rect.width / 2, rect.height / 2);
+  }
+
+  private applyZoom(factor: number, mx: number, my: number): void {
     const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, this.zoom * factor));
     this.panX = mx - (mx - this.panX) * (newZoom / this.zoom);
     this.panY = my - (my - this.panY) * (newZoom / this.zoom);
@@ -484,11 +477,13 @@ export class GridCanvasComponent implements OnChanges, AfterViewInit, OnDestroy 
     const y = (e.clientY - rect.top   - this.panY) / this.zoom;
     const cx = Math.floor(x / CELL);
     const cy = Math.floor(y / CELL);
-    this.hover = (cx >= 0 && cx < this.cols && cy >= 0 && cy < this.rows)
-      ? { x: cx, y: cy } : null;
+    const inBounds = cx >= 0 && cx < this.cols && cy >= 0 && cy < this.rows;
+    if (this.hover?.x !== cx || this.hover?.y !== cy || !inBounds) {
+      this.hover = inBounds ? { x: cx, y: cy } : null;
+    }
   }
 
-  onMouseUp(_e: MouseEvent): void {
+  onMouseUp(): void {
     this.isPanning = false;
   }
 
@@ -497,8 +492,8 @@ export class GridCanvasComponent implements OnChanges, AfterViewInit, OnDestroy 
     this.isPanning = false;
   }
 
-  onSvgClick(_e: MouseEvent): void {
-    if (this.didPan) { this.didPan = false; return; }
+  onSvgClick(): void {
+    if (this.consumePan()) return;
     if (this.activeTool && this.hover) {
       this.cellClick.emit({ x: this.hover.x, y: this.hover.y });
     } else {
@@ -507,25 +502,14 @@ export class GridCanvasComponent implements OnChanges, AfterViewInit, OnDestroy 
   }
 
   selectComponent(c: ComponentState): void {
-    if (this.didPan) { this.didPan = false; return; }
+    if (this.consumePan()) return;
     if (!this.activeTool) this.componentSelect.emit(c);
   }
 
-  @HostListener('document:keydown', ['$event'])
-  onKeyDown(e: KeyboardEvent): void {
-    const tag = (document.activeElement as HTMLElement)?.tagName ?? '';
-    if (e.code === 'Space' && tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
-      e.preventDefault();
-      this.spaceDown = true;
-    }
-  }
-
-  @HostListener('document:keyup', ['$event'])
-  onKeyUp(e: KeyboardEvent): void {
-    if (e.code === 'Space') {
-      this.spaceDown = false;
-      this.isPanning = false;
-    }
+  private consumePan(): boolean {
+    if (!this.didPan) return false;
+    this.didPan = false;
+    return true;
   }
 
   facingRot(f: Direction): number {
