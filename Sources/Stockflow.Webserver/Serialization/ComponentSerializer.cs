@@ -18,6 +18,7 @@ public static class ComponentSerializer
         SimComponentType.PackageGenerator => ComponentKinds.PackageGenerator,
         SimComponentType.PackageExit      => ComponentKinds.PackageExit,
         SimComponentType.MergeLogic       => ComponentKinds.MergeLogic,
+        SimComponentType.DiverterLogic    => ComponentKinds.DiverterLogic,
         _                                 => type.ToString().ToLowerInvariant(),
     };
 

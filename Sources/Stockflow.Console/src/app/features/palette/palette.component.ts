@@ -219,7 +219,7 @@ export class PaletteComponent {
 
   get isConveyor(): boolean {
     const kind = this.selectedItem?.kind;
-    return kind === 'conveyor_oneway' || kind === 'conveyor_turn' || kind === 'merge';
+    return kind === 'conveyor_oneway' || kind === 'conveyor_turn' || kind === 'merge' || kind === 'diverter';
   }
 
   select(it: PaletteItem): void {

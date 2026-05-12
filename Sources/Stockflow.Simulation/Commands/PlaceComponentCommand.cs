@@ -37,4 +37,10 @@ public sealed record PlaceMergeLogicCommand(
     float     Speed = 1f
 ) : ICommand;
 
+public sealed record PlaceDiverterLogicCommand(
+    GridCoord Position,
+    Direction Facing,
+    float     Speed = 1f
+) : ICommand;
+
 public sealed record RemoveComponentCommand(int ComponentId) : ICommand;

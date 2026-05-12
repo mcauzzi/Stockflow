@@ -7,4 +7,5 @@ public enum ComponentType
     PackageGenerator,
     PackageExit,
     MergeLogic,
+    DiverterLogic,
 }

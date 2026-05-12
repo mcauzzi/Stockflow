@@ -187,6 +187,27 @@ const FLOORS = [
                       text-anchor="middle" opacity="0.7">MRG</text>
               </ng-container>
 
+              <ng-container *ngSwitchCase="'diverter'">
+                <rect x="1" y="1" [attr.width]="CELL-2" [attr.height]="CELL-2"
+                      fill="#120d1e"
+                      [attr.stroke]="c.id === selectedId ? '#f5a623' : '#6d28d9'"
+                      [attr.stroke-width]="c.id === selectedId ? 1.5 : 1"/>
+                <g [attr.transform]="'rotate('+facingRot(c.facing)+' '+CELL/2+' '+CELL/2+')'">
+                  <line x1="3" [attr.y1]="CELL/2" [attr.x2]="CELL/2-1" [attr.y2]="CELL/2"
+                        stroke="#a78bfa" stroke-width="1.2"/>
+                  <line [attr.x1]="CELL/2+2" [attr.y1]="CELL/2" [attr.x2]="CELL-7" [attr.y2]="CELL/2"
+                        stroke="#a78bfa" stroke-width="1.2"/>
+                  <line [attr.x1]="CELL/2" [attr.y1]="CELL/2+2" [attr.x2]="CELL/2" [attr.y2]="CELL-7"
+                        stroke="#a78bfa" stroke-width="1.2" opacity="0.65"/>
+                  <polygon [attr.points]="arrowPtsMerge()" fill="#a78bfa"/>
+                  <polygon [attr.points]="arrowPtsDivertSide()" fill="#a78bfa"/>
+                  <circle [attr.cx]="CELL/2" [attr.cy]="CELL/2" r="1.8" fill="#a78bfa" opacity="0.9"/>
+                </g>
+                <text [attr.x]="CELL/2" y="7"
+                      font-size="5" fill="#a78bfa" font-family="JetBrains Mono,monospace"
+                      text-anchor="middle" opacity="0.7">DVT</text>
+              </ng-container>
+
               <ng-container *ngSwitchDefault>
                 <rect x="1" y="1" [attr.width]="CELL-2" [attr.height]="CELL-2"
                       fill="#181d24"
@@ -556,12 +577,18 @@ export class GridCanvasComponent implements OnChanges, AfterViewInit, OnDestroy 
     return `${x2-5},${y-3} ${x2},${y} ${x2-5},${y+3}`;
   }
 
+  arrowPtsDivertSide(): string {
+    const x = CELL / 2, y2 = CELL - 5;
+    return `${x-3},${y2-5} ${x},${y2} ${x+3},${y2-5}`;
+  }
+
   kindColor(kind: string): string {
     return kind === 'conveyor_oneway'   ? '#4ade80'
          : kind === 'conveyor_turn'     ? '#22d3ee'
          : kind === 'package_generator' ? '#86efac'
          : kind === 'package_exit'      ? '#fca5a5'
          : kind === 'merge'             ? '#38bdf8'
+         : kind === 'diverter'          ? '#a78bfa'
          : '#3d4652';
   }
 
