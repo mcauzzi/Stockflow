@@ -132,6 +132,7 @@ public sealed class SimulationController(
                 dir,
                 req.Mode == "priority" ? MergeMode.Priority : MergeMode.Alternating,
                 req.Speed ?? 1f),
+            ComponentKinds.DiverterLogic => new PlaceDiverterLogicCommand(pos, dir, req.Speed ?? 1f),
             _ => null,
         };
 

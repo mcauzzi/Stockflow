@@ -14,6 +14,7 @@ public static class ComponentSchemaRegistry
         ["package_generator"] = PackageGenerator.Schema,
         ["package_exit"]      = PackageExit.Schema,
         ["merge"]             = MergeLogic.Schema,
+        ["diverter"]          = DiverterLogic.Schema,
     };
 
     public static IReadOnlyDictionary<string, IReadOnlyList<PropertySchema>> GetAll() => _schemas;

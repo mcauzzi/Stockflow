@@ -33,6 +33,7 @@ public static class ComponentKinds
     public const string PackageGenerator = "package_generator";
     public const string PackageExit      = "package_exit";
     public const string MergeLogic       = "merge";
+    public const string DiverterLogic    = "diverter";
 }
 
 /// <summary>
