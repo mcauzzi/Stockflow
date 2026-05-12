@@ -16,7 +16,7 @@ public class DiverterLogic : ISimComponent
     public  IReadOnlyList<Port>             Ports    { get; }
     public  float                           Speed    { get; set; }
     public  RoutingGraph                    Graph    { get; }
-    public  IRoutingRule                    Rule     { get; }
+    public  IRoutingRule                    Rule     { get; private set; }
 
     private readonly Port    _inPort;
     private readonly Port    _outPort0;  // dritto
@@ -50,7 +50,9 @@ public class DiverterLogic : ISimComponent
 
     public static readonly PropertySchema[] Schema =
     [
-        new("speed", "Speed (m/s)", PropertyType.Float, DefaultValue: "1", Min: "0.01", Max: "10"),
+        new("speed",   "Speed (m/s)",  PropertyType.Float, DefaultValue: "1",                       Min: "0.01", Max: "10"),
+        new("routing", "Routing Rule", PropertyType.Enum,  DefaultValue: RoutingRuleFactory.RoundRobin,
+            EnumValues: RoutingRuleFactory.AvailableRules),
     ];
 
     public IReadOnlyList<PropertySchema> ConfigSchema => Schema;
@@ -65,15 +67,25 @@ public class DiverterLogic : ISimComponent
             var error = schema.Validate(value);
             if (error is not null) return error;
 
-            if (key == "speed")
-                Speed = float.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+            switch (key)
+            {
+                case "speed":
+                    Speed = float.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+                    break;
+                case "routing":
+                    var newKey = value.ToLowerInvariant();
+                    if (RoutingRuleFactory.KeyOf(Rule) != newKey)
+                        Rule = RoutingRuleFactory.Create(newKey);
+                    break;
+            }
         }
         return null;
     }
 
     public Dictionary<string, string> ExportProperties() => new()
     {
-        ["speed"] = Speed.ToString("F3"),
+        ["speed"]   = Speed.ToString("F3"),
+        ["routing"] = RoutingRuleFactory.KeyOf(Rule),
     };
 
     public void Tick(float deltaTime)
