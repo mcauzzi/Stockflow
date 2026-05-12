@@ -167,4 +167,73 @@ public class DiverterLogicTests
         // Output attivo (port1) è bloccato → l'entità resta sul diverter
         Assert.Same(e1, diverter.Occupant);
     }
+
+    // ── Schema / ApplyConfig / ExportProperties ──
+
+    [Fact]
+    public void Schema_ExposesRoutingAsConfigurableEnum()
+    {
+        var routing = DiverterLogic.Schema.Single(p => p.Key == "routing");
+
+        Assert.Equal(PropertyType.Enum, routing.Type);
+        Assert.False(routing.IsReadOnly);
+        Assert.Contains(RoutingRuleFactory.RoundRobin, routing.EnumValues!);
+        Assert.Equal(RoutingRuleFactory.RoundRobin, routing.DefaultValue);
+    }
+
+    [Fact]
+    public void ExportProperties_IncludesRoutingKey()
+    {
+        var diverter = MakeDiverter();
+
+        var exported = diverter.ExportProperties();
+
+        Assert.Equal(RoutingRuleFactory.RoundRobin, exported["routing"]);
+    }
+
+    [Fact]
+    public void ApplyConfig_AcceptsKnownRoutingRule()
+    {
+        var diverter = MakeDiverter();
+
+        var error = diverter.ApplyConfig(new Dictionary<string, string>
+        {
+            ["routing"] = RoutingRuleFactory.RoundRobin,
+        });
+
+        Assert.Null(error);
+        Assert.IsType<RoundRobinRoutingRule>(diverter.Rule);
+    }
+
+    [Fact]
+    public void ApplyConfig_RejectsUnknownRoutingRule()
+    {
+        var diverter = MakeDiverter();
+        var original = diverter.Rule;
+
+        var error = diverter.ApplyConfig(new Dictionary<string, string>
+        {
+            ["routing"] = "minimum_load",
+        });
+
+        Assert.NotNull(error);
+        Assert.Same(original, diverter.Rule);   // unchanged on validation failure
+    }
+
+    [Fact]
+    public void ApplyConfig_SameRoutingRule_PreservesInternalState()
+    {
+        // Reapplying the same strategy must NOT reset the rule (e.g. the round-robin counter).
+        var graph    = new RoutingGraph();
+        var diverter = MakeDiverter(graph);
+        var originalRule = diverter.Rule;
+
+        var error = diverter.ApplyConfig(new Dictionary<string, string>
+        {
+            ["routing"] = RoutingRuleFactory.RoundRobin,
+        });
+
+        Assert.Null(error);
+        Assert.Same(originalRule, diverter.Rule);
+    }
 }
