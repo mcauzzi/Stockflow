@@ -55,9 +55,9 @@ export interface PaletteItem {
         </div>
       </div>
 
-      <!-- Turn side selector (shown only for conveyor_turn) -->
-      <div class="facing" *ngIf="isConveyorTurn">
-        <div class="facing-lbl">TURN SIDE</div>
+      <!-- Side selector (conveyor_turn, diverter, merge) -->
+      <div class="facing" *ngIf="hasLateralSide">
+        <div class="facing-lbl">SIDE</div>
         <div class="facing-btns">
           <button class="dbtn" [class.on]="selectedTurnSide === 'Left'"  title="Left turn"  (click)="setTurnSide('Left')">L</button>
           <button class="dbtn" [class.on]="selectedTurnSide === 'Right'" title="Right turn" (click)="setTurnSide('Right')">R</button>
@@ -214,8 +214,10 @@ export class PaletteComponent {
     return null;
   }
 
-  get isConveyorTurn(): boolean { return this.selectedItem?.kind === 'conveyor_turn'; }
-  get isMerge():        boolean { return this.selectedItem?.kind === 'merge'; }
+  get isConveyorTurn():  boolean { return this.selectedItem?.kind === 'conveyor_turn'; }
+  get isMerge():         boolean { return this.selectedItem?.kind === 'merge'; }
+  get isDiverter():      boolean { return this.selectedItem?.kind === 'diverter'; }
+  get hasLateralSide():  boolean { return this.isConveyorTurn || this.isDiverter || this.isMerge; }
 
   get isConveyor(): boolean {
     const kind = this.selectedItem?.kind;

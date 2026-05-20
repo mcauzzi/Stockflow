@@ -120,9 +120,10 @@ export class App implements OnInit {
     if (!tool) return;
     const kind = tool.kind;
     const params: Record<string, unknown> = {};
-    if (kind === 'conveyor_turn') params['turn'] = this.placeTurnSide();
-    if (kind === 'conveyor_oneway' || kind === 'conveyor_turn') params['speed'] = this.placeSpeed();
-    if (kind === 'merge') { params['speed'] = this.placeSpeed(); params['mode'] = this.placeMergeMode(); }
+    if (kind === 'conveyor_turn') { params['turn'] = this.placeTurnSide(); params['speed'] = this.placeSpeed(); }
+    if (kind === 'conveyor_oneway') params['speed'] = this.placeSpeed();
+    if (kind === 'diverter')      { params['speed'] = this.placeSpeed(); params['side'] = this.placeTurnSide(); }
+    if (kind === 'merge')         { params['speed'] = this.placeSpeed(); params['mode'] = this.placeMergeMode(); params['side'] = this.placeTurnSide(); }
     this.sim.placeComponent(kind, cell.x, cell.y, this.placeFacing(),
       Object.keys(params).length ? params as any : undefined);
   }
