@@ -21,7 +21,7 @@ public class DiverterLogic : ISimComponent
 
     private readonly Port    _inPort;
     private readonly Port    _outPort0;  // dritto
-    private readonly Port    _outPort1;  // laterale destra
+    private readonly Port    _outPort1;  // laterale (sinistra o destra in base a Side)
     private readonly PortId[] _outputPorts;
 
     private static readonly PortId _portIn   = new(0);
