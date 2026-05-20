@@ -175,7 +175,10 @@ const FLOORS = [
                 <g [attr.transform]="'rotate('+facingRot(c.facing)+' '+CELL/2+' '+CELL/2+')'">
                   <line x1="3" [attr.y1]="CELL/2" [attr.x2]="CELL/2-1" [attr.y2]="CELL/2"
                         stroke="#38bdf8" stroke-width="1.2"/>
-                  <line [attr.x1]="CELL/2" y1="3" [attr.x2]="CELL/2" [attr.y2]="CELL/2-1"
+                  <line [attr.x1]="CELL/2"
+                        [attr.y1]="c.properties?.['side'] === 'right' ? CELL-3 : 3"
+                        [attr.x2]="CELL/2"
+                        [attr.y2]="c.properties?.['side'] === 'right' ? CELL/2+1 : CELL/2-1"
                         stroke="#38bdf8" stroke-width="1.2" opacity="0.65"/>
                   <line [attr.x1]="CELL/2+2" [attr.y1]="CELL/2" [attr.x2]="CELL-7" [attr.y2]="CELL/2"
                         stroke="#38bdf8" stroke-width="1.2"/>
@@ -197,10 +200,13 @@ const FLOORS = [
                         stroke="#a78bfa" stroke-width="1.2"/>
                   <line [attr.x1]="CELL/2+2" [attr.y1]="CELL/2" [attr.x2]="CELL-7" [attr.y2]="CELL/2"
                         stroke="#a78bfa" stroke-width="1.2"/>
-                  <line [attr.x1]="CELL/2" [attr.y1]="CELL/2+2" [attr.x2]="CELL/2" [attr.y2]="CELL-7"
+                  <line [attr.x1]="CELL/2"
+                        [attr.y1]="c.properties?.['side'] === 'left' ? CELL/2-2 : CELL/2+2"
+                        [attr.x2]="CELL/2"
+                        [attr.y2]="c.properties?.['side'] === 'left' ? 7 : CELL-7"
                         stroke="#a78bfa" stroke-width="1.2" opacity="0.65"/>
                   <polygon [attr.points]="arrowPtsMerge()" fill="#a78bfa"/>
-                  <polygon [attr.points]="arrowPtsDivertSide()" fill="#a78bfa"/>
+                  <polygon [attr.points]="arrowPtsDivertSide(c)" fill="#a78bfa"/>
                   <circle [attr.cx]="CELL/2" [attr.cy]="CELL/2" r="1.8" fill="#a78bfa" opacity="0.9"/>
                 </g>
                 <text [attr.x]="CELL/2" y="7"
@@ -577,8 +583,12 @@ export class GridCanvasComponent implements OnChanges, AfterViewInit, OnDestroy 
     return `${x2-5},${y-3} ${x2},${y} ${x2-5},${y+3}`;
   }
 
-  arrowPtsDivertSide(): string {
-    const x = CELL / 2, y2 = CELL - 5;
+  arrowPtsDivertSide(c: ComponentState): string {
+    const x = CELL / 2;
+    if (c.properties?.['side'] === 'left') {
+      return `${x-3},10 ${x},5 ${x+3},10`;
+    }
+    const y2 = CELL - 5;
     return `${x-3},${y2-5} ${x},${y2} ${x+3},${y2-5}`;
   }
 
