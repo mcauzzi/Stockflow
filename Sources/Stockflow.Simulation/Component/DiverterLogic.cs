@@ -10,6 +10,7 @@ public class DiverterLogic : ISimComponent
     public  int                             Id       { get; }
     public  GridCoord                       Position { get; }
     public  Direction                       Facing   { get; }
+    public  TurnSide                        Side     { get; }
     public  ComponentType                   Type     => ComponentType.DiverterLogic;
     public  IReadOnlyList<IComponentModule> Modules  { get; }
     public  SimEntity?                      Occupant { get; private set; }
@@ -27,21 +28,23 @@ public class DiverterLogic : ISimComponent
     private static readonly PortId _portOut0 = new(1);
     private static readonly PortId _portOut1 = new(2);
 
-    public DiverterLogic(int id, GridCoord position, Direction facing, float speed,
+    public DiverterLogic(int id, GridCoord position, Direction facing, TurnSide side, float speed,
                          RoutingGraph graph, IRoutingRule? rule = null,
                          IReadOnlyList<IComponentModule>? modules = null)
     {
-        Id      = id;
+        Id       = id;
         Position = position;
         Facing   = facing;
+        Side     = side;
         Speed    = speed;
         Graph    = graph;
         Rule     = rule ?? new RoundRobinRoutingRule();
         Modules  = modules ?? [];
 
+        var lateralDir = side == TurnSide.Right ? facing.RotateCW() : facing.RotateCCW();
         _inPort      = new(_portIn,   Position + facing.Opposite().ToOffset(), PortDirection.In);
         _outPort0    = new(_portOut0, Position + facing.ToOffset(),             PortDirection.Out);
-        _outPort1    = new(_portOut1, Position + facing.RotateCW().ToOffset(),  PortDirection.Out);
+        _outPort1    = new(_portOut1, Position + lateralDir.ToOffset(),         PortDirection.Out);
         _outputPorts = [_portOut0, _portOut1];
         Ports        = [_inPort, _outPort0, _outPort1];
     }
@@ -53,6 +56,8 @@ public class DiverterLogic : ISimComponent
         new("speed",   "Speed (m/s)",  PropertyType.Float, DefaultValue: "1",                       Min: "0.01", Max: "10"),
         new("routing", "Routing Rule", PropertyType.Enum,  DefaultValue: RoutingRuleFactory.RoundRobin,
             EnumValues: RoutingRuleFactory.AvailableRules),
+        new("side",    "Lateral Side", PropertyType.Enum,  DefaultValue: "right",
+            EnumValues: ["left", "right"], IsReadOnly: true),
     ];
 
     public IReadOnlyList<PropertySchema> ConfigSchema => Schema;
@@ -86,6 +91,7 @@ public class DiverterLogic : ISimComponent
     {
         ["speed"]   = Speed.ToString("F3"),
         ["routing"] = RoutingRuleFactory.KeyOf(Rule),
+        ["side"]    = Side == TurnSide.Right ? "right" : "left",
     };
 
     public void Tick(float deltaTime)

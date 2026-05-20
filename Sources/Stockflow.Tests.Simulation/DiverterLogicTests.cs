@@ -7,8 +7,10 @@ namespace Stockflow.Tests.Simulation;
 
 public class DiverterLogicTests
 {
-    private static DiverterLogic MakeDiverter(RoutingGraph? graph = null)
-        => new(1, new GridCoord(0, 0), Direction.North, 1f, graph ?? new RoutingGraph());
+    private static DiverterLogic MakeDiverter(
+        RoutingGraph? graph = null,
+        TurnSide      side  = TurnSide.Right)
+        => new(1, new GridCoord(0, 0), Direction.North, side, 1f, graph ?? new RoutingGraph());
 
     [Fact]
     public void TryAccept_EmptySlot_AcceptsEntity()
@@ -34,7 +36,7 @@ public class DiverterLogicTests
     }
 
     [Fact]
-    public void Ports_FacingNorth_CorrectPositions()
+    public void Ports_FacingNorth_SideRight_CorrectPositions()
     {
         // Facing=North, Position=(0,0)
         // InPort  (0): South = (0, 1)
@@ -49,6 +51,21 @@ public class DiverterLogicTests
         Assert.Equal(PortDirection.Out,    diverter.Ports[1].Direction);
 
         Assert.Equal(new GridCoord(1,  0), diverter.Ports[2].Position);
+        Assert.Equal(PortDirection.Out,    diverter.Ports[2].Direction);
+    }
+
+    [Fact]
+    public void Ports_FacingNorth_SideLeft_CorrectPositions()
+    {
+        var diverter = MakeDiverter(side: TurnSide.Left);
+
+        Assert.Equal(new GridCoord(0,  1), diverter.Ports[0].Position); // InPort  → South
+        Assert.Equal(PortDirection.In,     diverter.Ports[0].Direction);
+
+        Assert.Equal(new GridCoord(0, -1), diverter.Ports[1].Position); // OutPort0 → North (dritto)
+        Assert.Equal(PortDirection.Out,    diverter.Ports[1].Direction);
+
+        Assert.Equal(new GridCoord(-1, 0), diverter.Ports[2].Position); // OutPort1 → West (sinistra)
         Assert.Equal(PortDirection.Out,    diverter.Ports[2].Direction);
     }
 

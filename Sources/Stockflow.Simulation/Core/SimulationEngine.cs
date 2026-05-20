@@ -53,7 +53,7 @@ public class SimulationEngine
             [typeof(PlaceDiverterLogicCommand)] = (c, id) =>
             {
                 var x = (PlaceDiverterLogicCommand)c;
-                return new DiverterLogic(id, x.Position, x.Facing, x.Speed, Graph);
+                return new DiverterLogic(id, x.Position, x.Facing, TurnSide.Right, x.Speed, Graph);
             },
         };
     }
