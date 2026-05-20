@@ -8,9 +8,10 @@ namespace Stockflow.Tests.Simulation;
 public class MergeLogicTests
 {
     private static MergeLogic MakeMerge(
-        MergeMode    mode  = MergeMode.Alternating,
-        RoutingGraph? graph = null)
-        => new(1, new GridCoord(0, 0), Direction.North, mode, 1f,
+        MergeMode     mode  = MergeMode.Alternating,
+        RoutingGraph? graph = null,
+        TurnSide      side  = TurnSide.Left)
+        => new(1, new GridCoord(0, 0), Direction.North, mode, side, 1f,
                graph ?? new RoutingGraph());
 
     [Fact]
@@ -218,5 +219,39 @@ public class MergeLogicTests
         Assert.Equal(new GridCoord(-1,  0), merge.Ports[0].Position);
         Assert.Equal(new GridCoord(0,  -1), merge.Ports[1].Position);
         Assert.Equal(new GridCoord(1,   0), merge.Ports[2].Position);
+    }
+
+    [Fact]
+    public void Ports_FacingNorth_SideRight_CorrectPositions()
+    {
+        var merge = MakeMerge(side: TurnSide.Right);
+
+        // Facing=North, Side=Right:
+        // InPort0 (0): South = (0, 1)   — ingresso primario, invariato
+        // InPort1 (1): East  = (1, 0)   — ingresso secondario a destra
+        // OutPort (2): North = (0,-1)   — uscita, invariata
+        Assert.Equal(new GridCoord(0,  1), merge.Ports[0].Position);
+        Assert.Equal(PortDirection.In,     merge.Ports[0].Direction);
+
+        Assert.Equal(new GridCoord(1,  0), merge.Ports[1].Position);
+        Assert.Equal(PortDirection.In,     merge.Ports[1].Direction);
+
+        Assert.Equal(new GridCoord(0, -1), merge.Ports[2].Position);
+        Assert.Equal(PortDirection.Out,    merge.Ports[2].Direction);
+    }
+
+    [Fact]
+    public void SetFacing_WithSideRight_UsesRotateCW()
+    {
+        var merge = MakeMerge(side: TurnSide.Right);
+        merge.SetFacing(Direction.East);
+
+        // Facing=East, Side=Right:
+        // InPort0 (0): West  = (-1, 0)
+        // InPort1 (1): South = (0,  1)   — RotateCW di East
+        // OutPort (2): East  = ( 1, 0)
+        Assert.Equal(new GridCoord(-1, 0), merge.Ports[0].Position);
+        Assert.Equal(new GridCoord(0,  1), merge.Ports[1].Position);
+        Assert.Equal(new GridCoord(1,  0), merge.Ports[2].Position);
     }
 }

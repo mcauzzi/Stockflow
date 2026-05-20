@@ -16,6 +16,7 @@ public class MergeLogic : ISimComponent
     public  IReadOnlyList<Port>             Ports    => _ports;
     public  float                           Speed    { get; set; }
     public  MergeMode                       Mode     { get; set; }
+    public  TurnSide                        Side     { get; }
     public  RoutingGraph                    Graph    { get; }
 
     private Port   _inPort0;
@@ -30,12 +31,14 @@ public class MergeLogic : ISimComponent
     private static readonly PortId _port1 = new(1);
     private static readonly PortId _port2 = new(2);
 
-    public MergeLogic(int id, GridCoord position, Direction facing, MergeMode mode, float speed,
-                      RoutingGraph graph, IReadOnlyList<IComponentModule>? modules = null)
+    public MergeLogic(int id, GridCoord position, Direction facing, MergeMode mode, TurnSide side,
+                      float speed, RoutingGraph graph,
+                      IReadOnlyList<IComponentModule>? modules = null)
     {
         Id          = id;
         Position    = position;
         Mode        = mode;
+        Side        = side;
         Speed       = speed;
         Graph       = graph;
         Modules     = modules ?? [];
@@ -45,10 +48,11 @@ public class MergeLogic : ISimComponent
 
     public void SetFacing(Direction facing)
     {
+        var lateralDir = Side == TurnSide.Left ? facing.RotateCCW() : facing.RotateCW();
         Facing   = facing;
-        _inPort0 = new(_port0, Position + facing.Opposite().ToOffset(),  PortDirection.In);
-        _inPort1 = new(_port1, Position + facing.RotateCCW().ToOffset(), PortDirection.In);
-        _outPort = new(_port2, Position + facing.ToOffset(),             PortDirection.Out);
+        _inPort0 = new(_port0, Position + facing.Opposite().ToOffset(), PortDirection.In);
+        _inPort1 = new(_port1, Position + lateralDir.ToOffset(),        PortDirection.In);
+        _outPort = new(_port2, Position + facing.ToOffset(),            PortDirection.Out);
         _ports   = [_inPort0, _inPort1, _outPort];
     }
 
@@ -56,8 +60,10 @@ public class MergeLogic : ISimComponent
 
     public static readonly PropertySchema[] Schema =
     [
-        new("mode",  "Merge Mode",  PropertyType.Enum,  DefaultValue: "alternating", EnumValues: ["alternating", "priority"]),
-        new("speed", "Speed (m/s)", PropertyType.Float, DefaultValue: "1",           Min: "0.01", Max: "10"),
+        new("mode",  "Merge Mode",    PropertyType.Enum,  DefaultValue: "alternating", EnumValues: ["alternating", "priority"]),
+        new("speed", "Speed (m/s)",   PropertyType.Float, DefaultValue: "1",           Min: "0.01", Max: "10"),
+        new("side",  "Lateral Side",  PropertyType.Enum,  DefaultValue: "left",
+            EnumValues: ["left", "right"], IsReadOnly: true),
     ];
 
     public IReadOnlyList<PropertySchema> ConfigSchema => Schema;
@@ -90,6 +96,7 @@ public class MergeLogic : ISimComponent
     {
         ["mode"]  = Mode == MergeMode.Priority ? "priority" : "alternating",
         ["speed"] = Speed.ToString("F3"),
+        ["side"]  = Side == TurnSide.Left ? "left" : "right",
     };
 
     public void Tick(float deltaTime)
