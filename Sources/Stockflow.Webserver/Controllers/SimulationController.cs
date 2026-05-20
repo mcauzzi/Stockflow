@@ -130,9 +130,14 @@ public sealed class SimulationController(
             ComponentKinds.MergeLogic => new PlaceMergeLogicCommand(
                 pos,
                 dir,
-                Mode:  req.Mode == "priority" ? MergeMode.Priority : MergeMode.Alternating,
-                Speed: req.Speed ?? 1f),
-            ComponentKinds.DiverterLogic => new PlaceDiverterLogicCommand(pos, dir, Speed: req.Speed ?? 1f),
+                req.Mode == "priority" ? MergeMode.Priority : MergeMode.Alternating,
+                req.Side == "Left"     ? TurnSide.Left       : TurnSide.Right,
+                req.Speed ?? 1f),
+            ComponentKinds.DiverterLogic => new PlaceDiverterLogicCommand(
+                pos,
+                dir,
+                req.Side == "Left" ? TurnSide.Left : TurnSide.Right,
+                req.Speed ?? 1f),
             _ => null,
         };
 
@@ -223,4 +228,5 @@ public sealed record PlaceComponentRequest(
     float?  Size      = null,
     string? Turn      = null,
     float?  Speed     = null,
-    string? Mode      = null);
+    string? Mode      = null,
+    string? Side      = null);
