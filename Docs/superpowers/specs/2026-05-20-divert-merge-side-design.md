@@ -124,7 +124,51 @@ static TurnSide ParseSide(string? s, TurnSide defaultVal) =>
 
 ---
 
-## 6. Test
+## 6. Frontend Angular
+
+### palette.component.ts
+
+Il controllo "TURN SIDE" attualmente è visibile solo per `conveyor_turn` (`*ngIf="isConveyorTurn"`). Va esteso a `diverter` e `merge`.
+
+**Getter da aggiungere:**
+```typescript
+get isDiverter(): boolean { return this.selectedItem?.kind === 'diverter'; }
+get hasLateralSide(): boolean { return this.isConveyorTurn || this.isDiverter || this.isMerge; }
+```
+
+**Template — condition update:**
+```html
+<!-- Turn side selector — conveyor_turn, diverter, merge -->
+<div class="facing" *ngIf="hasLateralSide">
+  <div class="facing-lbl">SIDE</div>
+  ...
+</div>
+```
+
+Label cambia da `TURN SIDE` a `SIDE` (neutro per tutti e tre i componenti).
+
+### app.ts
+
+Nel handler di piazzamento, aggiungere il passaggio di `side` per `diverter` e `merge`:
+
+```typescript
+// riga esistente:
+if (kind === 'conveyor_turn') params['turn'] = this.placeTurnSide();
+
+// nuove righe:
+if (kind === 'diverter') params['side'] = this.placeTurnSide();
+if (kind === 'merge')    params['side'] = this.placeTurnSide();
+```
+
+`placeTurnSide` è già un `Signal<'Left' | 'Right'>` esistente — nessun nuovo signal necessario. Il server accetta il valore case-insensitive.
+
+### sim-mock.ts
+
+Nessuna modifica — `diverter` e `merge` sono già `live: true`.
+
+---
+
+## 7. Test
 
 | Test | Componente | Descrizione |
 |---|---|---|
@@ -135,7 +179,7 @@ static TurnSide ParseSide(string? s, TurnSide defaultVal) =>
 
 ---
 
-## 7. File da modificare
+## 8. File da modificare
 
 | File | Operazione |
 |---|---|
@@ -147,3 +191,5 @@ static TurnSide ParseSide(string? s, TurnSide defaultVal) =>
 | `Sources/Stockflow.Webserver/Serialization/ComponentSerializer.cs` | Espone `"side"` in `BuildProperties` |
 | `Sources/Stockflow.Tests.Simulation/DiverterLogicTests.cs` | Aggiunge/rinomina test porte |
 | `Sources/Stockflow.Tests.Simulation/MergeLogicTests.cs` | Aggiunge/rinomina test porte |
+| `Sources/Stockflow.Console/src/app/features/palette/palette.component.ts` | Aggiunge `isDiverter`, `hasLateralSide`; estende template |
+| `Sources/Stockflow.Console/src/app/app.ts` | Passa `side` param per diverter e merge |
