@@ -48,12 +48,12 @@ public class SimulationEngine
             [typeof(PlaceMergeLogicCommand)] = (c, id) =>
             {
                 var x = (PlaceMergeLogicCommand)c;
-                return new MergeLogic(id, x.Position, x.Facing, x.Mode, TurnSide.Left, x.Speed, Graph);
+                return new MergeLogic(id, x.Position, x.Facing, x.Mode, x.Side, x.Speed, Graph);
             },
             [typeof(PlaceDiverterLogicCommand)] = (c, id) =>
             {
                 var x = (PlaceDiverterLogicCommand)c;
-                return new DiverterLogic(id, x.Position, x.Facing, TurnSide.Right, x.Speed, Graph);
+                return new DiverterLogic(id, x.Position, x.Facing, x.Side, x.Speed, Graph);
             },
         };
     }
