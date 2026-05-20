@@ -105,7 +105,7 @@ public class ConfigSchemaTests
     {
         var graph = new RoutingGraph();
         var merge = new MergeLogic(1, new GridCoord(5, 5), Direction.North,
-                        MergeMode.Alternating, 1f, graph);
+                        MergeMode.Alternating, TurnSide.Left, 1f, graph);
 
         var error = merge.ApplyConfig(new Dictionary<string, string> { ["mode"] = "priority" });
 

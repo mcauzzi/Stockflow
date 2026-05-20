@@ -48,7 +48,7 @@ public class SimulationEngine
             [typeof(PlaceMergeLogicCommand)] = (c, id) =>
             {
                 var x = (PlaceMergeLogicCommand)c;
-                return new MergeLogic(id, x.Position, x.Facing, x.Mode, x.Speed, Graph);
+                return new MergeLogic(id, x.Position, x.Facing, x.Mode, TurnSide.Left, x.Speed, Graph);
             },
             [typeof(PlaceDiverterLogicCommand)] = (c, id) =>
             {
