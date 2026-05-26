@@ -9,7 +9,13 @@ public class RoutingGraph
     public void Connect(ISimComponent from, PortId fromPort,
                         ISimComponent to,   PortId toPort)
     {
-        connections[(from, fromPort)] = new Connection(from, fromPort, to, toPort);
+        var key = (from, fromPort);
+        if (connections.ContainsKey(key))
+            throw new InvalidOperationException(
+                $"Output port {fromPort} of component {from.Id} is already connected. " +
+                $"Call Disconnect first.");
+
+        connections[key] = new Connection(from, fromPort, to, toPort);
     }
 
     public void Disconnect(ISimComponent component, PortId port)
