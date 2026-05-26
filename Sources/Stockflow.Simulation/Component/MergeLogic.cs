@@ -24,8 +24,8 @@ public class MergeLogic : ISimComponent
     private Port   _outPort;
     private Port[] _ports = [];
     private PortId _activePort;
-    private int    _stallTicks;
-    private const int StallThreshold = 30;
+    private float  _stallTime;
+    private const float StallSeconds = 1f;
 
     private static readonly PortId _port0 = new(0);
     private static readonly PortId _port1 = new(1);
@@ -103,11 +103,11 @@ public class MergeLogic : ISimComponent
     {
         if (Occupant == null)
         {
-            _stallTicks++;
-            if (_stallTicks >= StallThreshold)
+            _stallTime += deltaTime;
+            if (_stallTime >= StallSeconds)
             {
                 _activePort = _activePort == _port0 ? _port1 : _port0;
-                _stallTicks = 0;
+                _stallTime  = 0f;
             }
             return;
         }
@@ -137,7 +137,7 @@ public class MergeLogic : ISimComponent
         entity.CurrentComponent = this;
         entity.CurrentPort      = fromPort;
         entity.Progress         = 0.0f;
-        _stallTicks             = 0;
+        _stallTime              = 0f;
 
         if (Mode == MergeMode.Alternating)
             _activePort = _activePort == _port0 ? _port1 : _port0;
