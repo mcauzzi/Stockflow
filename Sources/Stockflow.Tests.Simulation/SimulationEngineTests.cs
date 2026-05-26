@@ -148,4 +148,36 @@ public class SimulationEngineTests
         // Facing=East: outPort at (6,5)
         Assert.Equal(new GridCoord(6, 5), merge.Ports[2].Position);
     }
+
+    [Fact]
+    public void SimulationClock_IsLiveMode_FalseByDefault()
+    {
+        var clock = new SimulationClock();
+        Assert.False(clock.IsLiveMode);
+    }
+
+    [Fact]
+    public void SimulationClock_EnterLiveMode_SetsTrue()
+    {
+        var clock = new SimulationClock();
+        clock.EnterLiveMode();
+        Assert.True(clock.IsLiveMode);
+    }
+
+    [Fact]
+    public void SimulationClock_ExitLiveMode_SetsFalse()
+    {
+        var clock = new SimulationClock();
+        clock.EnterLiveMode();
+        clock.ExitLiveMode();
+        Assert.False(clock.IsLiveMode);
+    }
+
+    [Fact]
+    public void SimulationClock_IsLiveMode_FalseAtTimeScaleOne()
+    {
+        var clock = new SimulationClock();
+        clock.TimeScale = 1f;
+        Assert.False(clock.IsLiveMode);
+    }
 }
