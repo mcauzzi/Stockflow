@@ -1,3 +1,4 @@
+using System;
 using Stockflow.Simulation.Entity;
 using Stockflow.Simulation.Grid;
 using Stockflow.Simulation.Modules;
@@ -15,6 +16,7 @@ public class PackageExit : ISimComponent
 
     private readonly EntityManager _entities;
     private readonly Port          _inPort;
+    private readonly Func<float>?  _getSimTime;
     private readonly Queue<float>  _recentCompletionTimes = new();
     private          float         _simTime;
     private          float         _totalFulfillmentTime;
@@ -27,10 +29,12 @@ public class PackageExit : ISimComponent
     public SimEntity?                      Occupant { get; private set; }
     public IReadOnlyList<Port>             Ports    { get; }
 
+    private float CurrentSimTime => _getSimTime?.Invoke() ?? _simTime;
+
     // Read-only metrics visible to the frontend
     public int   TotalProcessed     { get; private set; }
     public float Throughput         => _recentCompletionTimes.Count > 0
-                                           ? _recentCompletionTimes.Count / MathF.Min(_simTime, ThroughputWindow)
+                                           ? _recentCompletionTimes.Count / MathF.Min(CurrentSimTime, ThroughputWindow)
                                            : 0f;
     public float AvgFulfillmentTime => TotalProcessed > 0
                                            ? _totalFulfillmentTime / TotalProcessed
@@ -38,15 +42,17 @@ public class PackageExit : ISimComponent
 
     public PackageExit(int id, GridCoord position, Direction facing,
                        EntityManager entities,
+                       Func<float>? getSimTime = null,
                        IReadOnlyList<IComponentModule>? modules = null)
     {
-        Id        = id;
-        Position  = position;
-        Facing    = facing;
-        _entities = entities;
-        Modules   = modules ?? [];
-        _inPort   = new(new(0), Position + Facing.Opposite().ToOffset(), PortDirection.In);
-        Ports     = [_inPort];
+        Id          = id;
+        Position    = position;
+        Facing      = facing;
+        _entities   = entities;
+        _getSimTime = getSimTime;
+        Modules     = modules ?? [];
+        _inPort     = new(new(0), Position + Facing.Opposite().ToOffset(), PortDirection.In);
+        Ports       = [_inPort];
     }
 
     // --- ConfigSchema ---
@@ -79,13 +85,14 @@ public class PackageExit : ISimComponent
 
         if (Occupant == null) return;
 
-        var fulfillment = _simTime - Occupant.EntryTime;
+        var now         = CurrentSimTime;
+        var fulfillment = now - Occupant.EntryTime;
         TotalProcessed++;
         _totalFulfillmentTime += fulfillment;
-        _recentCompletionTimes.Enqueue(_simTime);
+        _recentCompletionTimes.Enqueue(now);
 
         // Trim completions that have left the rolling window
-        while (_recentCompletionTimes.Count > 0 && _simTime - _recentCompletionTimes.Peek() > ThroughputWindow)
+        while (_recentCompletionTimes.Count > 0 && now - _recentCompletionTimes.Peek() > ThroughputWindow)
             _recentCompletionTimes.Dequeue();
 
         foreach (var m in Modules)

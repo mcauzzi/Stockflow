@@ -1,3 +1,4 @@
+using System;
 using Stockflow.Simulation.Entity;
 using Stockflow.Simulation.Grid;
 using Stockflow.Simulation.Modules;
@@ -13,6 +14,7 @@ public class PackageGenerator : ISimComponent
 {
     private readonly EntityManager _entities;
     private readonly Port          _outPort;
+    private readonly Func<float>?  _getSimTime;
     private          float         _accumulated;
     private          float         _simTime;
 
@@ -36,20 +38,22 @@ public class PackageGenerator : ISimComponent
                             float spawnRate, string sku, float weight, float size,
                             RoutingGraph graph,
                             EntityManager entities,
+                            Func<float>? getSimTime = null,
                             IReadOnlyList<IComponentModule>? modules = null)
     {
-        Id        = id;
-        Position  = position;
-        Facing    = facing;
-        SpawnRate = spawnRate;
-        Sku       = sku;
-        Weight    = weight;
-        Size      = size;
-        Graph     = graph;
-        _entities = entities;
-        Modules   = modules ?? [];
-        _outPort  = new(new(0), Position + Facing.ToOffset(), PortDirection.Out);
-        Ports     = [_outPort];
+        Id          = id;
+        Position    = position;
+        Facing      = facing;
+        SpawnRate   = spawnRate;
+        Sku         = sku;
+        Weight      = weight;
+        Size        = size;
+        Graph       = graph;
+        _entities   = entities;
+        _getSimTime = getSimTime;
+        Modules     = modules ?? [];
+        _outPort    = new(new(0), Position + Facing.ToOffset(), PortDirection.Out);
+        Ports       = [_outPort];
     }
 
     // --- ConfigSchema ---
@@ -128,7 +132,8 @@ public class PackageGenerator : ISimComponent
         if (_accumulated < 1f / SpawnRate) return;
 
         _accumulated -= 1f / SpawnRate;
-        Occupant = _entities.Spawn(Sku, Weight, Size, _simTime, this, _outPort.Id);
+        var currentTime = _getSimTime?.Invoke() ?? _simTime;
+        Occupant = _entities.Spawn(Sku, Weight, Size, currentTime, this, _outPort.Id);
     }
 
     // Generators are source-only — nothing enters them
