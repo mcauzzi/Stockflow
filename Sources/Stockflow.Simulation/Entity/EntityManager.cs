@@ -13,7 +13,7 @@ public class EntityManager
     public IReadOnlyCollection<SimEntity> GetAll() => _active.Values;
 
     public IEnumerable<SimEntity> GetByComponent(int componentId)
-        => _active.Values.Where(e => e.CurrentComponent.Id == componentId);
+        => _active.Values.Where(e => e.CurrentComponent?.Id == componentId);
 
     public SimEntity Spawn(string sku, float weight, float size, float entryTime,
                            ISimComponent startComponent, PortId startPort)
