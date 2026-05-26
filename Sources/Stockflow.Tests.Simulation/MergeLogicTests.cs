@@ -114,7 +114,8 @@ public class MergeLogicTests
         var merge = MakeMerge(MergeMode.Priority);
         var mgr   = new EntityManager();
 
-        for (int i = 0; i < 30; i++) merge.Tick(0f);
+        // Stall for > 1 second (threshold) at 10 Hz
+        for (int i = 0; i < 11; i++) merge.Tick(0.1f);
 
         var entity = mgr.Spawn("A", 1f, 1f, 0f, merge, new PortId(1));
         Assert.True(merge.TryAccept(entity, new PortId(1)));
@@ -129,7 +130,8 @@ public class MergeLogicTests
         var exit  = new PackageExit(2, new GridCoord(0, -1), Direction.North, mgr);
         graph.Connect(merge, new PortId(2), exit, new PortId(0));
 
-        for (int i = 0; i < 30; i++) merge.Tick(0f);
+        // Stall for > 1 second (threshold) at 10 Hz
+        for (int i = 0; i < 11; i++) merge.Tick(0.1f);
 
         var e1 = mgr.Spawn("A", 1f, 1f, 0f, merge, new PortId(1));
         merge.TryAccept(e1, new PortId(1));
@@ -183,7 +185,7 @@ public class MergeLogicTests
     }
 
     [Fact]
-    public void StallTicks_ResetOnAccept()
+    public void StallTime_ResetOnAccept()
     {
         var graph = new RoutingGraph();
         var merge = MakeMerge(MergeMode.Priority, graph);
@@ -191,13 +193,15 @@ public class MergeLogicTests
         var exit  = new PackageExit(2, new GridCoord(0, -1), Direction.North, mgr);
         graph.Connect(merge, new PortId(2), exit, new PortId(0));
 
-        for (int i = 0; i < 15; i++) merge.Tick(0f);
+        // Stall for 0.5s (below 1s threshold) at 10 Hz
+        for (int i = 0; i < 5; i++) merge.Tick(0.1f);
 
         var e1 = mgr.Spawn("A", 1f, 1f, 0f, merge, new PortId(0));
         merge.TryAccept(e1, new PortId(0));
         merge.Tick(1f); merge.Tick(0f); exit.Tick(0f);
 
-        for (int i = 0; i < 29; i++) merge.Tick(0f);
+        // Stall for 0.9s after accept (below threshold — should not switch)
+        for (int i = 0; i < 9; i++) merge.Tick(0.1f);
 
         var e2 = mgr.Spawn("B", 1f, 1f, 0f, merge, new PortId(1));
         Assert.False(merge.TryAccept(e2, new PortId(1)));
@@ -253,5 +257,40 @@ public class MergeLogicTests
         Assert.Equal(new GridCoord(-1, 0), merge.Ports[0].Position);
         Assert.Equal(new GridCoord(0,  1), merge.Ports[1].Position);
         Assert.Equal(new GridCoord(1,  0), merge.Ports[2].Position);
+    }
+
+    [Theory]
+    [InlineData(10f,  0.1f)]   // 10 Hz tick rate
+    [InlineData(100f, 0.01f)]  // 100 Hz tick rate
+    public void Alternating_StarvationSwitchesAtSameWallTime_RegardlessOfTickRate(
+        float ticksPerSecond, float deltaTime)
+    {
+        var graph = new RoutingGraph();
+        var merge = new MergeLogic(1, new GridCoord(0, 0), Direction.North,
+                                   MergeMode.Alternating, TurnSide.Left, 1f, graph);
+        var mgr   = new EntityManager();
+
+        // Merge is empty; stall threshold = 1 second.
+        // Tick for just under 1 second → port0 should still be active.
+        var ticksBelowThreshold = (int)(0.9f / deltaTime);
+        for (var i = 0; i < ticksBelowThreshold; i++)
+            merge.Tick(deltaTime);
+
+        var entity0 = mgr.Spawn("A", 1f, 1f, 0f, merge, new PortId(0));
+        Assert.True(merge.TryAccept(entity0, new PortId(0)),
+            "Port0 should still be active before stall threshold");
+
+        // Reset: create a fresh merge to test the "above threshold" side independently
+        var merge2 = new MergeLogic(2, new GridCoord(0, 0), Direction.North,
+                                    MergeMode.Alternating, TurnSide.Left, 1f, graph);
+
+        // Tick for over 1 second → should switch to port1
+        var ticksAboveThreshold = (int)(1.1f / deltaTime);
+        for (var i = 0; i < ticksAboveThreshold; i++)
+            merge2.Tick(deltaTime);
+
+        var entity1 = mgr.Spawn("B", 1f, 1f, 0f, merge2, new PortId(1));
+        Assert.True(merge2.TryAccept(entity1, new PortId(1)),
+            $"Port1 should be active after stall threshold at {ticksPerSecond}Hz");
     }
 }
