@@ -81,4 +81,21 @@ public class OneWayConveyorTests
 
         Assert.Same(entity, conveyor.Occupant);
     }
+
+    [Fact]
+    public void Tick_WhenBlocked_ProgressClampedAtOne()
+    {
+        var graph  = new RoutingGraph();
+        var conv   = new OneWayConveyor(1, new GridCoord(0, 0), Direction.North, 5f, graph);
+        var mgr    = new EntityManager();
+        var entity = mgr.Spawn("X", 1f, 1f, 0f, conv, new PortId(0));
+        conv.TryAccept(entity, new PortId(0));
+
+        // Tick many times with no next component → blocked
+        conv.Tick(1f);
+        conv.Tick(1f);
+        conv.Tick(1f);
+
+        Assert.Equal(1f, entity.Progress);
+    }
 }
