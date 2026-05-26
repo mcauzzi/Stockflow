@@ -2,6 +2,7 @@ using Stockflow.Simulation.Component;
 using Stockflow.Simulation.Entity;
 using Stockflow.Simulation.Grid;
 using Stockflow.Simulation.Modules;
+using Stockflow.Simulation.Routing;
 
 namespace Stockflow.Tests.Simulation;
 
@@ -162,5 +163,32 @@ public class PackageExitTests
         exit.TryAccept(entity, new PortId(0));
 
         Assert.Equal(1, spy.EnterCount);
+    }
+
+    [Fact]
+    public void FulfillmentTime_IsPositive_WhenExitCreatedAfterGeneratorHasRun()
+    {
+        var sharedTime = 0f;
+        var mgr        = new EntityManager();
+        var graph      = new RoutingGraph();
+
+        var gen = new PackageGenerator(1, new GridCoord(0, 0), Direction.North,
+                                       1f, "PKG", 1f, 1f, graph, mgr,
+                                       getSimTime: () => sharedTime);
+        sharedTime = 5f;
+        gen.Tick(1f); // spawns entity with entryTime=5
+
+        var exit = new PackageExit(2, new GridCoord(0, 1), Direction.North, mgr,
+                                   getSimTime: () => sharedTime);
+        graph.Connect(gen, gen.Ports[0].Id, exit, exit.Ports[0].Id);
+
+        sharedTime = 5.5f;
+        gen.Tick(0f);   // push entity to exit
+
+        sharedTime = 6f;
+        exit.Tick(0.5f);
+
+        Assert.True(exit.AvgFulfillmentTime > 0f,
+            $"Fulfillment time should be positive, was {exit.AvgFulfillmentTime}");
     }
 }

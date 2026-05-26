@@ -38,12 +38,14 @@ public class SimulationEngine
                 var x = (PlacePackageGeneratorCommand)c;
                 return new PackageGenerator(id, x.Position, x.Facing,
                                             x.SpawnRate, x.Sku, x.Weight, x.Size,
-                                            Graph, State.Entities);
+                                            Graph, State.Entities,
+                                            getSimTime: () => Clock.SimulatedTime);
             },
             [typeof(PlacePackageExitCommand)] = (c, id) =>
             {
                 var x = (PlacePackageExitCommand)c;
-                return new PackageExit(id, x.Position, x.Facing, State.Entities);
+                return new PackageExit(id, x.Position, x.Facing, State.Entities,
+                                       getSimTime: () => Clock.SimulatedTime);
             },
             [typeof(PlaceMergeLogicCommand)] = (c, id) =>
             {
