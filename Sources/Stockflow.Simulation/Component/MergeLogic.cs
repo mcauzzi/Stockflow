@@ -114,7 +114,7 @@ public class MergeLogic : ISimComponent
 
         if (Occupant.Progress < 1.0f)
         {
-            Occupant.Progress += Speed * deltaTime;
+            Occupant.Progress = MathF.Min(Occupant.Progress + Speed * deltaTime, 1.0f);
         }
         else
         {

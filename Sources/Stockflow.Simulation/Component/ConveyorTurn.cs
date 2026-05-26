@@ -82,7 +82,7 @@ public class ConveyorTurn : ISimComponent
         if (Occupant == null) return;
         if (Occupant.Progress < 1.0f)
         {
-            Occupant.Progress += Speed * deltaTime;
+            Occupant.Progress = MathF.Min(Occupant.Progress + Speed * deltaTime, 1.0f);
         }
         else
         {
