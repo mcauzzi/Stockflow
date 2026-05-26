@@ -70,7 +70,11 @@ public class SimulationEngine
     {
         Clock.Advance(deltaTime);
         foreach (var component in State.Components)
+        {
             component.Tick(deltaTime);
+            foreach (var module in component.Modules)
+                module.OnTick(deltaTime);
+        }
     }
 
     public CommandResult ProcessCommand(ICommand command)

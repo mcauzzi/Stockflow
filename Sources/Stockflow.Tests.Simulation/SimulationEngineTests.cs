@@ -3,6 +3,7 @@ using Stockflow.Simulation.Component;
 using Stockflow.Simulation.Core;
 using Stockflow.Simulation.Entity;
 using Stockflow.Simulation.Grid;
+using Stockflow.Simulation.Modules;
 using Stockflow.Simulation.Routing;
 using Stockflow.Tests.Simulation.Helpers;
 
@@ -179,5 +180,29 @@ public class SimulationEngineTests
         var clock = new SimulationClock();
         clock.TimeScale = 1f;
         Assert.False(clock.IsLiveMode);
+    }
+
+    private sealed class OnTickSpyModule : IComponentModule
+    {
+        public int OnTickCallCount { get; private set; }
+        public void OnEntityEnter(SimEntity e) { }
+        public void OnEntityExit(SimEntity e)  { }
+        public void OnTick(float dt)           => OnTickCallCount++;
+    }
+
+    [Fact]
+    public void Tick_InvokesOnTickOnAllModules()
+    {
+        var engine = new SimulationEngine(10, 10, 1);
+        var spy    = new OnTickSpyModule();
+        var graph  = new RoutingGraph();
+        var conv   = new OneWayConveyor(99, new GridCoord(3, 3), Direction.North, 1f, graph,
+                                        modules: [spy]);
+        engine.State.Components.Add(conv);
+
+        engine.Tick(0.1f);
+        engine.Tick(0.1f);
+
+        Assert.Equal(2, spy.OnTickCallCount);
     }
 }
