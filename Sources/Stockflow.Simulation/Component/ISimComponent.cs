@@ -1,3 +1,4 @@
+using Stockflow.Simulation.Core;
 using Stockflow.Simulation.Entity;
 using Stockflow.Simulation.Grid;
 using Stockflow.Simulation.Modules;
@@ -15,6 +16,8 @@ public interface ISimComponent
     SimEntity?                      Occupant { get; }
     // Porte attraverso cui le entità entrano/escono
     IReadOnlyList<Port> Ports { get; }
+    // Events generated during Tick — drained by SimulationEngine
+    IReadOnlyList<SimulationEvent> PendingEvents { get; }
 
     // --- Schema-driven configuration (Phase 1D) ---
 

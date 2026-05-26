@@ -1,3 +1,4 @@
+using Stockflow.Simulation.Core;
 using Stockflow.Simulation.Entity;
 using Stockflow.Simulation.Grid;
 using Stockflow.Simulation.Modules;
@@ -18,6 +19,9 @@ public class OneWayConveyor : ISimComponent
     public  IReadOnlyList<Port>             Ports    { get; }
     public  float                           Speed    { get; set; }
     public  RoutingGraph                    Graph    { get; }
+
+    private readonly List<SimulationEvent>  _pendingEvents = new();
+    public  IReadOnlyList<SimulationEvent>  PendingEvents  => _pendingEvents;
 
     public OneWayConveyor(int          id,    GridCoord position, Direction facing, float speed,
                           RoutingGraph graph, IReadOnlyList<IComponentModule>? modules = null)
@@ -65,6 +69,7 @@ public class OneWayConveyor : ISimComponent
 
     public void Tick(float deltaTime)
     {
+        _pendingEvents.Clear();
         if (Occupant == null) return;
         if (Occupant.Progress < 1.0f)
         {
@@ -78,10 +83,34 @@ public class OneWayConveyor : ISimComponent
                 var nextComp = next.Value.To;
                 if (nextComp.TryAccept(Occupant, next.Value.ToPort))
                 {
+                    _pendingEvents.Add(new SimulationEvent
+                    {
+                        Type        = SimulationEventType.EntityTransferred,
+                        EntityId    = Occupant.Id,
+                        ComponentId = Id,
+                    });
                     foreach (var module in Modules)
                         module.OnEntityExit(Occupant);
                     Occupant = null;
                 }
+                else
+                {
+                    _pendingEvents.Add(new SimulationEvent
+                    {
+                        Type        = SimulationEventType.ConveyorJammed,
+                        EntityId    = Occupant.Id,
+                        ComponentId = Id,
+                    });
+                }
+            }
+            else
+            {
+                _pendingEvents.Add(new SimulationEvent
+                {
+                    Type        = SimulationEventType.ConveyorJammed,
+                    EntityId    = Occupant.Id,
+                    ComponentId = Id,
+                });
             }
         }
     }
