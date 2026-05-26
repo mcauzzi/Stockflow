@@ -102,6 +102,8 @@ public class PackageExit : ISimComponent
         entity.CurrentComponent = this;
         entity.CurrentPort      = fromPort;
         entity.Progress         = 0f;
+        foreach (var m in Modules)
+            m.OnEntityEnter(entity);
         return true;
     }
 }

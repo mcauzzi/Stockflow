@@ -108,8 +108,6 @@ public class PackageGenerator : ISimComponent
 
     public void Tick(float deltaTime)
     {
-        _simTime += deltaTime;
-
         // Try to push buffered entity downstream first (natural backpressure)
         if (Occupant != null)
         {
@@ -125,6 +123,7 @@ public class PackageGenerator : ISimComponent
 
         if (!IsEnabled || SpawnRate <= 0f) return;
 
+        _simTime     += deltaTime;
         _accumulated += deltaTime;
         if (_accumulated < 1f / SpawnRate) return;
 
