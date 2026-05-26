@@ -1,4 +1,5 @@
 using System;
+using Stockflow.Simulation.Core;
 using Stockflow.Simulation.Entity;
 using Stockflow.Simulation.Grid;
 using Stockflow.Simulation.Modules;
@@ -18,14 +19,15 @@ public class PackageGenerator : ISimComponent
     private          float         _accumulated;
     private          float         _simTime;
 
-    public int                             Id       { get; }
-    public GridCoord                       Position { get; }
-    public Direction                       Facing   { get; }
-    public ComponentType                   Type     => ComponentType.PackageGenerator;
-    public IReadOnlyList<IComponentModule> Modules  { get; }
-    public SimEntity?                      Occupant { get; private set; }
-    public IReadOnlyList<Port>             Ports    { get; }
-    public RoutingGraph                    Graph    { get; }
+    public int                             Id            { get; }
+    public GridCoord                       Position      { get; }
+    public Direction                       Facing        { get; }
+    public ComponentType                   Type          => ComponentType.PackageGenerator;
+    public IReadOnlyList<IComponentModule> Modules       { get; }
+    public SimEntity?                      Occupant      { get; private set; }
+    public IReadOnlyList<Port>             Ports         { get; }
+    public IReadOnlyList<SimulationEvent>  PendingEvents => [];
+    public RoutingGraph                    Graph         { get; }
 
     // Configurable parameters
     public float  SpawnRate { get; set; }   // entities per second

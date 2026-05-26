@@ -1,3 +1,4 @@
+using Stockflow.Simulation.Core;
 using Stockflow.Simulation.Entity;
 using Stockflow.Simulation.Grid;
 using Stockflow.Simulation.Modules;
@@ -19,10 +20,13 @@ public class DiverterLogic : ISimComponent
     public  RoutingGraph                    Graph    { get; }
     public  IRoutingRule                    Rule     { get; private set; }
 
-    private readonly Port    _inPort;
-    private readonly Port    _outPort0;  // dritto
-    private readonly Port    _outPort1;  // laterale (sinistra o destra in base a Side)
+    private readonly Port     _inPort;
+    private readonly Port     _outPort0;  // dritto
+    private readonly Port     _outPort1;  // laterale (sinistra o destra in base a Side)
     private readonly PortId[] _outputPorts;
+
+    private readonly List<SimulationEvent> _pendingEvents = new();
+    public  IReadOnlyList<SimulationEvent> PendingEvents  => _pendingEvents;
 
     private static readonly PortId _portIn   = new(0);
     private static readonly PortId _portOut0 = new(1);
@@ -96,6 +100,7 @@ public class DiverterLogic : ISimComponent
 
     public void Tick(float deltaTime)
     {
+        _pendingEvents.Clear();
         if (Occupant == null) return;
 
         if (Occupant.Progress < 1.0f)
@@ -106,14 +111,38 @@ public class DiverterLogic : ISimComponent
 
         var targetPort = Rule.SelectOutput(Occupant, _outputPorts);
         var next       = Graph.GetNext(this, targetPort);
-        if (next == null) return;
+        if (next == null)
+        {
+            _pendingEvents.Add(new SimulationEvent
+            {
+                Type        = SimulationEventType.ConveyorJammed,
+                EntityId    = Occupant.Id,
+                ComponentId = Id,
+            });
+            return;
+        }
 
         if (next.Value.To.TryAccept(Occupant, next.Value.ToPort))
         {
+            _pendingEvents.Add(new SimulationEvent
+            {
+                Type        = SimulationEventType.EntityTransferred,
+                EntityId    = Occupant.Id,
+                ComponentId = Id,
+            });
             foreach (var module in Modules)
                 module.OnEntityExit(Occupant);
             Rule.OnTransferSucceeded(targetPort);
             Occupant = null;
+        }
+        else
+        {
+            _pendingEvents.Add(new SimulationEvent
+            {
+                Type        = SimulationEventType.ConveyorJammed,
+                EntityId    = Occupant.Id,
+                ComponentId = Id,
+            });
         }
     }
 

@@ -205,4 +205,49 @@ public class SimulationEngineTests
 
         Assert.Equal(2, spy.OnTickCallCount);
     }
+
+    [Fact]
+    public void GetStateDelta_AfterEntityTransfer_ContainsEntityTransferredEvent()
+    {
+        // Place two conveyors adjacent so AutoConnect wires them together.
+        // North = offset (0,-1), so c1 facing South has OutPort at (0,1).
+        // c1 at (0,0) facing South, c2 at (0,1) facing South.
+        // c1.OutPort → c2.InPort (auto-connected via adjacent grid cell).
+        var engine = new SimulationEngine(10, 10, 1);
+        engine.ProcessCommand(new PlaceOneWayConveyorCommand(new GridCoord(0, 0), Direction.South, 2f));
+        engine.ProcessCommand(new PlaceOneWayConveyorCommand(new GridCoord(0, 1), Direction.South, 2f));
+        var c1 = engine.State.Components[0];
+
+        // Spawn entity directly on c1 (progress = 0 → 1 needs 0.5 s at speed 2)
+        var entity = engine.State.Entities.Spawn("X", 1f, 1f, 0f, c1, c1.Ports[0].Id);
+        c1.TryAccept(entity, c1.Ports[0].Id);
+        engine.GetStateDelta(); // baseline
+
+        engine.Tick(1f);  // progress reaches 1.0 (speed=2 → 0.5s needed, 1s is enough)
+        engine.Tick(0f);  // trigger transfer (Progress >= 1.0 → attempt hand-off)
+
+        var delta = engine.GetStateDelta();
+        Assert.Contains(delta.Events,
+            e => e.Type == SimulationEventType.EntityTransferred && e.EntityId == entity.Id);
+    }
+
+    [Fact]
+    public void GetStateDelta_WhenEntityBlocked_ContainsConveyorJammedEvent()
+    {
+        // Single conveyor with no downstream — entity jams at Progress >= 1.0
+        var engine = new SimulationEngine(10, 10, 1);
+        engine.ProcessCommand(new PlaceOneWayConveyorCommand(new GridCoord(0, 0), Direction.North, 2f));
+        var c1 = engine.State.Components[0];
+
+        var entity = engine.State.Entities.Spawn("X", 1f, 1f, 0f, c1, c1.Ports[0].Id);
+        c1.TryAccept(entity, c1.Ports[0].Id);
+        engine.GetStateDelta();
+
+        engine.Tick(1f);  // progress reaches 1.0 (speed=2)
+        engine.Tick(0f);  // Progress >= 1.0 → attempts transfer, no next → jammed
+
+        var delta = engine.GetStateDelta();
+        Assert.Contains(delta.Events,
+            e => e.Type == SimulationEventType.ConveyorJammed && e.EntityId == entity.Id);
+    }
 }

@@ -1,3 +1,4 @@
+using Stockflow.Simulation.Core;
 using Stockflow.Simulation.Entity;
 using Stockflow.Simulation.Grid;
 using Stockflow.Simulation.Modules;
@@ -26,6 +27,9 @@ public class MergeLogic : ISimComponent
     private PortId _activePort;
     private float  _stallTime;
     private const float StallSeconds = 1f;
+
+    private readonly List<SimulationEvent> _pendingEvents = new();
+    public  IReadOnlyList<SimulationEvent> PendingEvents  => _pendingEvents;
 
     private static readonly PortId _port0 = new(0);
     private static readonly PortId _port1 = new(1);
@@ -101,6 +105,7 @@ public class MergeLogic : ISimComponent
 
     public void Tick(float deltaTime)
     {
+        _pendingEvents.Clear();
         if (Occupant == null)
         {
             _stallTime += deltaTime;
@@ -121,9 +126,24 @@ public class MergeLogic : ISimComponent
             var next = Graph.GetNext(this, _outPort.Id);
             if (next != null && next.Value.To.TryAccept(Occupant, next.Value.ToPort))
             {
+                _pendingEvents.Add(new SimulationEvent
+                {
+                    Type        = SimulationEventType.EntityTransferred,
+                    EntityId    = Occupant.Id,
+                    ComponentId = Id,
+                });
                 foreach (var module in Modules)
                     module.OnEntityExit(Occupant);
                 Occupant = null;
+            }
+            else
+            {
+                _pendingEvents.Add(new SimulationEvent
+                {
+                    Type        = SimulationEventType.ConveyorJammed,
+                    EntityId    = Occupant.Id,
+                    ComponentId = Id,
+                });
             }
         }
     }

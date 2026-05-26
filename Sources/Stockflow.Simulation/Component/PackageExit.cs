@@ -1,4 +1,5 @@
 using System;
+using Stockflow.Simulation.Core;
 using Stockflow.Simulation.Entity;
 using Stockflow.Simulation.Grid;
 using Stockflow.Simulation.Modules;
@@ -14,20 +15,22 @@ public class PackageExit : ISimComponent
 {
     private const float ThroughputWindow = 10f; // rolling window in seconds
 
-    private readonly EntityManager _entities;
-    private readonly Port          _inPort;
-    private readonly Func<float>?  _getSimTime;
-    private readonly Queue<float>  _recentCompletionTimes = new();
-    private          float         _simTime;
-    private          float         _totalFulfillmentTime;
+    private readonly EntityManager        _entities;
+    private readonly Port                 _inPort;
+    private readonly Func<float>?         _getSimTime;
+    private readonly Queue<float>         _recentCompletionTimes = new();
+    private readonly List<SimulationEvent> _pendingEvents = new();
+    private          float                _simTime;
+    private          float                _totalFulfillmentTime;
 
-    public int                             Id       { get; }
-    public GridCoord                       Position { get; }
-    public Direction                       Facing   { get; }
-    public ComponentType                   Type     => ComponentType.PackageExit;
-    public IReadOnlyList<IComponentModule> Modules  { get; }
-    public SimEntity?                      Occupant { get; private set; }
-    public IReadOnlyList<Port>             Ports    { get; }
+    public int                             Id            { get; }
+    public GridCoord                       Position      { get; }
+    public Direction                       Facing        { get; }
+    public ComponentType                   Type          => ComponentType.PackageExit;
+    public IReadOnlyList<IComponentModule> Modules       { get; }
+    public SimEntity?                      Occupant      { get; private set; }
+    public IReadOnlyList<Port>             Ports         { get; }
+    public IReadOnlyList<SimulationEvent>  PendingEvents => _pendingEvents;
 
     private float CurrentSimTime => _getSimTime?.Invoke() ?? _simTime;
 
@@ -81,6 +84,7 @@ public class PackageExit : ISimComponent
 
     public void Tick(float deltaTime)
     {
+        _pendingEvents.Clear();
         _simTime += deltaTime;
 
         if (Occupant == null) return;
@@ -94,6 +98,13 @@ public class PackageExit : ISimComponent
         // Trim completions that have left the rolling window
         while (_recentCompletionTimes.Count > 0 && now - _recentCompletionTimes.Peek() > ThroughputWindow)
             _recentCompletionTimes.Dequeue();
+
+        _pendingEvents.Add(new SimulationEvent
+        {
+            Type        = SimulationEventType.EntityTransferred,
+            EntityId    = Occupant.Id,
+            ComponentId = Id,
+        });
 
         foreach (var m in Modules)
             m.OnEntityExit(Occupant);

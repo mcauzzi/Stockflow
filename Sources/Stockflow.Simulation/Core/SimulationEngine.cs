@@ -13,6 +13,7 @@ public class SimulationEngine
     private HashSet<int>                 _knownEntityIds    = new();
     private Dictionary<int, EntityState> _lastEntityStates  = new();
     private int                          _nextComponentId   = 1;
+    private readonly List<SimulationEvent> _pendingEvents   = new();
 
     public SimulationEngine(int width, int length, int height)
     {
@@ -74,6 +75,7 @@ public class SimulationEngine
         foreach (var component in State.Components)
         {
             component.Tick(deltaTime);
+            _pendingEvents.AddRange(component.PendingEvents);
             foreach (var module in component.Modules)
                 module.OnTick(deltaTime);
         }
@@ -245,6 +247,9 @@ public class SimulationEngine
             return true;
         });
 
+        var events = _pendingEvents.ToList();
+        _pendingEvents.Clear();
+
         return new StateDelta
         {
             SimulationTime      = Clock.SimulatedTime,
@@ -253,6 +258,7 @@ public class SimulationEngine
             AddedEntityStates   = addedEntities,
             UpdatedEntityStates = updatedEntities,
             RemovedEntityIds    = removedEntities,
+            Events              = events,
         };
     }
 }
