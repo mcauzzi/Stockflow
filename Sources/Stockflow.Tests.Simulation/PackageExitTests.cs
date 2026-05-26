@@ -1,6 +1,7 @@
 using Stockflow.Simulation.Component;
 using Stockflow.Simulation.Entity;
 using Stockflow.Simulation.Grid;
+using Stockflow.Simulation.Modules;
 
 namespace Stockflow.Tests.Simulation;
 
@@ -137,5 +138,29 @@ public class PackageExitTests
 
         // East.Opposite() = West → InPort.Position = (2,2) + (-1,0) = (1,2)
         Assert.Equal(new GridCoord(1, 2), inPort.Position);
+    }
+
+    private sealed class SpyModule : IComponentModule
+    {
+        public int EnterCount { get; private set; }
+        public int ExitCount  { get; private set; }
+        public int TickCount  { get; private set; }
+        public void OnEntityEnter(SimEntity e) => EnterCount++;
+        public void OnEntityExit(SimEntity e)  => ExitCount++;
+        public void OnTick(float dt)           => TickCount++;
+    }
+
+    [Fact]
+    public void TryAccept_NotifiesModuleOnEntityEnter()
+    {
+        var mgr    = new EntityManager();
+        var spy    = new SpyModule();
+        var exit   = new PackageExit(1, new GridCoord(0, 0), Direction.North, mgr,
+                                     modules: [spy]);
+        var entity = mgr.Spawn("X", 1f, 1f, 0f, exit, new PortId(0));
+
+        exit.TryAccept(entity, new PortId(0));
+
+        Assert.Equal(1, spy.EnterCount);
     }
 }
