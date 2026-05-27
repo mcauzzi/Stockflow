@@ -44,7 +44,7 @@ public sealed class SimulationController(
             timeScale      = engine.TimeScale,
             gridWidth      = engine.Grid.Width,
             gridLength     = engine.Grid.Length,
-            gridFloors     = engine.Grid.Height,
+            gridFloors     = engine.Grid.Floors,
             components     = components.Select(c => new
             {
                 id         = c.Id,

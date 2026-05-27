@@ -23,7 +23,7 @@ public class LoadScenarioCommandTests
         Assert.True(result.Success);
         Assert.Equal(20, engine.Grid.Width);
         Assert.Equal(15, engine.Grid.Length);
-        Assert.Equal(2,  engine.Grid.Height);
+        Assert.Equal(2,  engine.Grid.Floors);
     }
 
     [Fact]
