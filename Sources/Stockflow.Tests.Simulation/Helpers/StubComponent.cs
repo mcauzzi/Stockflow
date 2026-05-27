@@ -21,6 +21,7 @@ internal sealed class StubComponent(int id = 0, GridCoord position = default) : 
     public IReadOnlyList<PropertySchema>          ConfigSchema      => [];
     public string?                                ApplyConfig(IReadOnlyDictionary<string, string> properties) => null;
     public Dictionary<string, string>             ExportProperties() => [];
+    public bool                                   SetFacing(Direction newFacing) => false;
 
     public void Tick(float deltaTime) => TickCount++;
 

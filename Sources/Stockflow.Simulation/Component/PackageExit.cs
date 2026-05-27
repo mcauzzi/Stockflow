@@ -113,6 +113,8 @@ public class PackageExit : ISimComponent
         Occupant = null;
     }
 
+    public bool SetFacing(Direction newFacing) => false;
+
     public bool TryAccept(SimEntity entity, PortId fromPort)
     {
         if (Occupant != null) return false;

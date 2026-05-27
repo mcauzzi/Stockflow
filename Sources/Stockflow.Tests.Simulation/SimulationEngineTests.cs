@@ -250,4 +250,30 @@ public class SimulationEngineTests
         Assert.Contains(delta.Events,
             e => e.Type == SimulationEventType.ConveyorJammed && e.EntityId == entity.Id);
     }
+
+    [Theory]
+    [InlineData("OneWayConveyor")]
+    [InlineData("ConveyorTurn")]
+    [InlineData("Diverter")]
+    public void ConfigureComponent_SetFacing_SucceedsForConveyorTypes(string kind)
+    {
+        var engine = new SimulationEngine(10, 10, 1);
+        ICommand placeCmd = kind switch
+        {
+            "OneWayConveyor" => new PlaceOneWayConveyorCommand(new GridCoord(5, 5), Direction.North, 1f),
+            "ConveyorTurn"   => new PlaceConveyorTurnCommand(new GridCoord(5, 5), Direction.North,
+                                                              TurnSide.Right, 1f),
+            "Diverter"       => new PlaceDiverterLogicCommand(new GridCoord(5, 5), Direction.North,
+                                                               TurnSide.Right, 1f),
+            _                => throw new ArgumentException(kind),
+        };
+        engine.ProcessCommand(placeCmd);
+        var comp = engine.State.Components[0];
+
+        var result = engine.ProcessCommand(new ConfigureComponentCommand(comp.Id,
+            new Dictionary<string, string> { ["facing"] = "East" }));
+
+        Assert.True(result.Success, result.ErrorMessage ?? "no error message");
+        Assert.Equal(Direction.East, comp.Facing);
+    }
 }
