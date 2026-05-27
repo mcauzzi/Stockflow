@@ -17,13 +17,13 @@ public class GridManager
 
     public int Width  { get; }
     public int Length { get; }
-    public int Height { get; }
+    public int Floors { get; }
 
-    public GridManager(int width, int length, int height)
+    public GridManager(int width, int length, int floors)
     {
         Width  = width;
         Length = length;
-        Height = height;
+        Floors = floors;
 
         _grid = new Cell[width][][];
         for (int x = 0; x < width; x++)
@@ -31,8 +31,8 @@ public class GridManager
             _grid[x] = new Cell[length][];
             for (int y = 0; y < length; y++)
             {
-                _grid[x][y] = new Cell[height];
-                for (int z = 0; z < height; z++)
+                _grid[x][y] = new Cell[floors];
+                for (int z = 0; z < floors; z++)
                     _grid[x][y][z] = new Cell(new GridCoord(x, y, z));
             }
         }
@@ -41,7 +41,7 @@ public class GridManager
     public bool IsInBounds(GridCoord coord) =>
         coord.X >= 0 && coord.X < Width  &&
         coord.Y >= 0 && coord.Y < Length &&
-        coord.Floor >= 0 && coord.Floor < Height;
+        coord.Floor >= 0 && coord.Floor < Floors;
 
     public bool TryGetCell(GridCoord coord, out Cell cell)
     {

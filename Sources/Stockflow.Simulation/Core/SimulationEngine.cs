@@ -15,10 +15,10 @@ public class SimulationEngine
     private int                          _nextComponentId   = 1;
     private readonly List<SimulationEvent> _pendingEvents   = new();
 
-    public SimulationEngine(int width, int length, int height)
+    public SimulationEngine(int width, int length, int floors)
     {
         Clock = new SimulationClock();
-        Grid  = new GridManager(width, length, height);
+        Grid  = new GridManager(width, length, floors);
         Graph = new RoutingGraph();
         State = new();
 
