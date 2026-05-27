@@ -455,26 +455,27 @@ Helper condiviso: `Helpers/StubComponent` — implementazione minimale di `ISimC
 
 ---
 
-## Stato attuale e gap noti
+## Stato attuale (aggiornato 2026-05-27)
 
 | Componente | Stato |
 |---|---|
-| `SimulationEngine` + tick loop | ✅ Implementato |
-| `SimulationClock` (`SimulatedTime`, `TimeScale`, `IsLiveMode`, `Advance`) | ✅ Implementato (#5) |
-| `GridManager` + `Cell` + `GridCoord` | ✅ Implementato |
-| `ISimComponent` + `OneWayConveyor` | ✅ Implementato |
-| `ConveyorTurn` + `TurnSide` | ✅ Implementato (#20) |
-| `RoutingGraph` + `Connection` | ✅ Implementato |
-| `ICommand` + `CommandResult` | ✅ Implementati |
-| `StateDelta` (componenti + entità + eventi) | ✅ Implementata (#6) |
-| `SimulationEvent` (`EntityTransferred`, `ConveyorJammed`) | ✅ Dichiarata; non ancora emessa nel tick |
-| `IComponentModule` (interfaccia) | ✅ Implementata; `OnTick` non ancora invocato |
-| `SimEntity` + `EntityStatus` | ✅ Implementati (#6) |
-| `EntityState` (snapshot rete) | ✅ Implementato (#6) |
-| `EntityManager` (CRUD + object pool) | ✅ Implementato (#6) |
-| Entità in `SimulationState` | ✅ Implementato (#6) |
-| Unit test `Stockflow.Tests.Simulation` | ✅ Implementati (#20) — 38 test, tutti passanti |
-| Delta completo (posizioni aggiornate tick-by-tick) | Parziale — issue #8 |
-| Emissione `SimulationEvent` durante il tick | Mancante — da collegare a #8 |
-| Comandi concreti | Mancanti — issue #33 |
-| Logica routing con `DestinationComponent` | Mancante — issue #28 |
+| `SimulationEngine` + tick loop | ✅ |
+| `SimulationClock` (SimulatedTime, TimeScale, IsLiveMode esplicito) | ✅ |
+| `GridManager` + `Cell` + `GridCoord` | ✅ |
+| `ISimComponent` + `OneWayConveyor` | ✅ |
+| `ConveyorTurn` + `TurnSide` | ✅ |
+| `MergeLogic` (Alternating/Priority, Side, starvation time-based) | ✅ |
+| `DiverterLogic` (RoundRobin, Side, SetFacing) | ✅ |
+| `PackageGenerator` + `PackageExit` (shared clock via getSimTime) | ✅ |
+| `RoutingGraph` + `Connection` (Connect guard) | ✅ |
+| `ICommand` + comandi concreti (Place/Remove/Configure/LoadScenario) | ✅ |
+| `StateDelta` completa (componenti + entità + eventi) | ✅ |
+| `SimulationEvent` (EntityTransferred, ConveyorJammed) emessa nel tick | ✅ |
+| Schema-driven config (`ConfigSchema`, `ApplyConfig`, `ExportProperties`) | ✅ |
+| `IComponentModule.OnTick` invocato dall'engine | ✅ |
+| `SetFacing` runtime su OneWayConveyor, ConveyorTurn, DiverterLogic | ✅ |
+| Unit test | ✅ 153 test, tutti passanti |
+| `AccumulatorLogic` | ⬜ |
+| `PathFinder` su `RoutingGraph` | ⬜ |
+| `Scaffalature` + `StackerCraneLogic` | ⬜ |
+| `MissionController` + `OrderManager` | ⬜ |
