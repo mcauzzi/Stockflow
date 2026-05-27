@@ -151,7 +151,11 @@ public class SimulationEngine
             {
                 Graph.DisconnectAll(component);
                 if (!component.SetFacing(newDir))
+                {
+                    // SetFacing failed — reconnect to avoid leaving the component orphaned
+                    AutoConnect(component);
                     return CommandResult.Fail($"Component type {component.Type} does not support runtime facing changes");
+                }
                 AutoConnect(component);
             }
         }
