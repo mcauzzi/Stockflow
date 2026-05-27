@@ -26,7 +26,8 @@ public class PackageGenerator : ISimComponent
     public IReadOnlyList<IComponentModule> Modules       { get; }
     public SimEntity?                      Occupant      { get; private set; }
     public IReadOnlyList<Port>             Ports         { get; }
-    public IReadOnlyList<SimulationEvent>  PendingEvents => [];
+    private static readonly IReadOnlyList<SimulationEvent> _noPendingEvents = [];
+    public IReadOnlyList<SimulationEvent>  PendingEvents => _noPendingEvents;
     public RoutingGraph                    Graph         { get; }
 
     // Configurable parameters
