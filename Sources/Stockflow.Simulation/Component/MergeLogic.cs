@@ -50,7 +50,7 @@ public class MergeLogic : ISimComponent
         SetFacing(facing);
     }
 
-    public void SetFacing(Direction facing)
+    public bool SetFacing(Direction facing)
     {
         var lateralDir = Side == TurnSide.Left ? facing.RotateCCW() : facing.RotateCW();
         Facing   = facing;
@@ -58,6 +58,7 @@ public class MergeLogic : ISimComponent
         _inPort1 = new(_port1, Position + lateralDir.ToOffset(),        PortDirection.In);
         _outPort = new(_port2, Position + facing.ToOffset(),            PortDirection.Out);
         _ports   = [_inPort0, _inPort1, _outPort];
+        return true;
     }
 
     // --- ConfigSchema ---

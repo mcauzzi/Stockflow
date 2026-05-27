@@ -10,13 +10,13 @@ public class OneWayConveyor : ISimComponent
 {
     public  int                             Id       { get; }
     public  GridCoord                       Position { get; }
-    public  Direction                       Facing   { get; }
+    public  Direction                       Facing   { get; private set; }
     public  ComponentType                   Type     => ComponentType.OneWayConveyor;
     public  IReadOnlyList<IComponentModule> Modules  { get; }
     public  SimEntity?                      Occupant { get; private set; }
-    private Port                            InPort   { get; }
-    private Port                            OutPort  { get; }
-    public  IReadOnlyList<Port>             Ports    { get; }
+    private Port                            InPort   { get; set; }
+    private Port                            OutPort  { get; set; }
+    public  IReadOnlyList<Port>             Ports    { get; private set; }
     public  float                           Speed    { get; set; }
     public  RoutingGraph                    Graph    { get; }
 
@@ -32,9 +32,24 @@ public class OneWayConveyor : ISimComponent
         Modules  = modules ?? [];
         Speed    = speed;
         Graph    = graph;
-        InPort   = new(new(0), Position+Facing.Opposite().ToOffset(), PortDirection.In);
-        OutPort  = new(new(1), Position+Facing.ToOffset(), PortDirection.Out);
-        Ports    = [InPort, OutPort];
+        InPort   = default;
+        OutPort  = default;
+        Ports    = [];
+        RebuildPorts();
+    }
+
+    private void RebuildPorts()
+    {
+        InPort  = new(new(0), Position + Facing.Opposite().ToOffset(), PortDirection.In);
+        OutPort = new(new(1), Position + Facing.ToOffset(),            PortDirection.Out);
+        Ports   = [InPort, OutPort];
+    }
+
+    public bool SetFacing(Direction newFacing)
+    {
+        Facing = newFacing;
+        RebuildPorts();
+        return true;
     }
 
     // --- ConfigSchema ---

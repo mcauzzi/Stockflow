@@ -10,13 +10,13 @@ public class ConveyorTurn : ISimComponent
 {
     public  int                             Id       { get; }
     public  GridCoord                       Position { get; }
-    public  Direction                       Facing   { get; }
+    public  Direction                       Facing   { get; private set; }
     public  ComponentType                   Type     => ComponentType.ConveyorTurn;
     public  IReadOnlyList<IComponentModule> Modules  { get; }
     public  SimEntity?                      Occupant { get; private set; }
-    private Port                            InPort   { get; }
-    private Port                            OutPort  { get; }
-    public  IReadOnlyList<Port>             Ports    { get; }
+    private Port                            InPort   { get; set; }
+    private Port                            OutPort  { get; set; }
+    public  IReadOnlyList<Port>             Ports    { get; private set; }
     public  float                           Speed    { get; set; }
     public  TurnSide                        Turn     { get; set; }
     public  RoutingGraph                    Graph    { get; }
@@ -34,11 +34,25 @@ public class ConveyorTurn : ISimComponent
         Speed    = speed;
         Graph    = graph;
         Modules  = modules ?? [];
+        InPort   = default;
+        OutPort  = default;
+        Ports    = [];
+        RebuildPorts();
+    }
 
-        var exitFacing = turn == TurnSide.Right ? facing.RotateCW() : facing.RotateCCW();
-        InPort  = new(new(0), Position + facing.Opposite().ToOffset(), PortDirection.In);
+    private void RebuildPorts()
+    {
+        var exitFacing = Turn == TurnSide.Right ? Facing.RotateCW() : Facing.RotateCCW();
+        InPort  = new(new(0), Position + Facing.Opposite().ToOffset(), PortDirection.In);
         OutPort = new(new(1), Position + exitFacing.ToOffset(),        PortDirection.Out);
         Ports   = [InPort, OutPort];
+    }
+
+    public bool SetFacing(Direction newFacing)
+    {
+        Facing = newFacing;
+        RebuildPorts();
+        return true;
     }
 
     // --- ConfigSchema ---

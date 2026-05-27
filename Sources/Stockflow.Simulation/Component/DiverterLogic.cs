@@ -10,19 +10,19 @@ public class DiverterLogic : ISimComponent
 {
     public  int                             Id       { get; }
     public  GridCoord                       Position { get; }
-    public  Direction                       Facing   { get; }
+    public  Direction                       Facing   { get; private set; }
     public  TurnSide                        Side     { get; }
     public  ComponentType                   Type     => ComponentType.DiverterLogic;
     public  IReadOnlyList<IComponentModule> Modules  { get; }
     public  SimEntity?                      Occupant { get; private set; }
-    public  IReadOnlyList<Port>             Ports    { get; }
+    public  IReadOnlyList<Port>             Ports    { get; private set; }
     public  float                           Speed    { get; set; }
     public  RoutingGraph                    Graph    { get; }
     public  IRoutingRule                    Rule     { get; private set; }
 
-    private readonly Port     _inPort;
-    private readonly Port     _outPort0;  // dritto
-    private readonly Port     _outPort1;  // laterale (sinistra o destra in base a Side)
+    private Port     _inPort;
+    private Port     _outPort0;  // dritto
+    private Port     _outPort1;  // laterale (sinistra o destra in base a Side)
     private readonly PortId[] _outputPorts;
 
     private readonly List<SimulationEvent> _pendingEvents = new();
@@ -36,21 +36,36 @@ public class DiverterLogic : ISimComponent
                          RoutingGraph graph, IRoutingRule? rule = null,
                          IReadOnlyList<IComponentModule>? modules = null)
     {
-        Id       = id;
-        Position = position;
-        Facing   = facing;
-        Side     = side;
-        Speed    = speed;
-        Graph    = graph;
-        Rule     = rule ?? new RoundRobinRoutingRule();
-        Modules  = modules ?? [];
-
-        var lateralDir = side == TurnSide.Right ? facing.RotateCW() : facing.RotateCCW();
-        _inPort      = new(_portIn,   Position + facing.Opposite().ToOffset(), PortDirection.In);
-        _outPort0    = new(_portOut0, Position + facing.ToOffset(),             PortDirection.Out);
-        _outPort1    = new(_portOut1, Position + lateralDir.ToOffset(),         PortDirection.Out);
+        Id           = id;
+        Position     = position;
+        Facing       = facing;
+        Side         = side;
+        Speed        = speed;
+        Graph        = graph;
+        Rule         = rule ?? new RoundRobinRoutingRule();
+        Modules      = modules ?? [];
+        _inPort      = default;
+        _outPort0    = default;
+        _outPort1    = default;
         _outputPorts = [_portOut0, _portOut1];
-        Ports        = [_inPort, _outPort0, _outPort1];
+        Ports        = [];
+        RebuildPorts();
+    }
+
+    private void RebuildPorts()
+    {
+        var lateralDir = Side == TurnSide.Right ? Facing.RotateCW() : Facing.RotateCCW();
+        _inPort   = new(_portIn,   Position + Facing.Opposite().ToOffset(), PortDirection.In);
+        _outPort0 = new(_portOut0, Position + Facing.ToOffset(),            PortDirection.Out);
+        _outPort1 = new(_portOut1, Position + lateralDir.ToOffset(),        PortDirection.Out);
+        Ports     = [_inPort, _outPort0, _outPort1];
+    }
+
+    public bool SetFacing(Direction newFacing)
+    {
+        Facing = newFacing;
+        RebuildPorts();
+        return true;
     }
 
     // --- ConfigSchema ---

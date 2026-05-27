@@ -142,19 +142,17 @@ public class SimulationEngine
             return CommandResult.Fail($"Component {cmd.ComponentId} not found");
 
         // --- Special case: facing change requires RoutingGraph surgery ---
-        if (cmd.Properties.TryGetValue("facing", out var facingStr) &&
-            Enum.TryParse<Direction>(facingStr, ignoreCase: true, out var newDir) &&
-            newDir != component.Facing)
+        if (cmd.Properties.TryGetValue("facing", out var facingStr))
         {
-            switch (component)
+            if (!Enum.TryParse<Direction>(facingStr, ignoreCase: true, out var newDir))
+                return CommandResult.Fail($"Invalid direction: {facingStr}");
+
+            if (newDir != component.Facing)
             {
-                case MergeLogic merge:
-                    Graph.DisconnectAll(merge);
-                    merge.SetFacing(newDir);
-                    AutoConnect(merge);
-                    break;
-                default:
-                    return CommandResult.Fail($"Component type {component.Type} does not support runtime facing change");
+                Graph.DisconnectAll(component);
+                if (!component.SetFacing(newDir))
+                    return CommandResult.Fail($"Component type {component.Type} does not support runtime facing changes");
+                AutoConnect(component);
             }
         }
 

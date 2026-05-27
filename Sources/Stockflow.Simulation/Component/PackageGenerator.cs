@@ -138,6 +138,8 @@ public class PackageGenerator : ISimComponent
         Occupant = _entities.Spawn(Sku, Weight, Size, currentTime, this, _outPort.Id);
     }
 
+    public bool SetFacing(Direction newFacing) => false;
+
     // Generators are source-only — nothing enters them
     public bool TryAccept(SimEntity entity, PortId fromPort) => false;
 }

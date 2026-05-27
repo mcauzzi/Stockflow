@@ -42,6 +42,12 @@ public interface ISimComponent
     /// </summary>
     Dictionary<string, string> ExportProperties();
 
+    /// <summary>
+    /// Attempts to change the component's facing direction at runtime, rebuilding ports accordingly.
+    /// Returns true if the component supports runtime facing changes (conveyors), false otherwise.
+    /// </summary>
+    bool SetFacing(Direction newFacing);
+
     // Chiamato ogni tick — gestisce logica interna
     // (es. il traslo muove le forche, l'accumulo decide se rilasciare)
     void Tick(float deltaTime);
