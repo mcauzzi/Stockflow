@@ -1,30 +1,15 @@
 import { Component, Input, OnChanges, inject } from '@angular/core';
-import { NgIf } from '@angular/common';
+import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ComponentState } from '../../core/models/protocol';
+import { PropertySchema } from '../../core/models/protocol';
 import { SimStateService } from '../../core/services/sim-state.service';
-
-const KIND_LABELS: Record<string, string> = {
-  'conveyor_oneway':   'ONE-WAY CONVEYOR',
-  'conveyor_turn':     'CONVEYOR TURN 90°',
-  'package_generator': 'PACKAGE GENERATOR',
-  'package_exit':      'PACKAGE EXIT',
-  'merge':             'MERGE',
-  'diverter':          'DIVERTER',
-  'accum':             'ACCUMULATOR',
-  'rack':              'RACK BAY',
-  'rack-d':            'RACK DOUBLE-DEPTH',
-  'traslo':            'TRASLOELEVATOR',
-  'bay-in':            'INBOUND BAY',
-  'bay-out':           'OUTBOUND BAY',
-  'pick':              'PICKING STATION',
-  'qc':                'QC STATION',
-};
+import { SchemaService } from '../../core/services/schema.service';
 
 @Component({
   selector: 'app-inspector',
   standalone: true,
-  imports: [NgIf, FormsModule],
+  imports: [NgIf, NgFor, FormsModule],
   template: `
     <div class="insp">
 
@@ -61,91 +46,63 @@ const KIND_LABELS: Record<string, string> = {
           </div>
         </div>
 
-        <!-- ── PACKAGE GENERATOR ─────────────────────────── -->
-        <ng-container *ngIf="isGenerator">
+        <!-- ── Writable properties (schema-driven) ──────────────────────── -->
+        <ng-container *ngIf="writableProps.length > 0">
           <div class="panel-head"><span>CONFIG</span></div>
           <div class="sec form-sec">
-            <div class="field">
-              <label class="field-lbl">Spawn Rate <span class="unit">pkg/s</span></label>
-              <input class="field-input" type="number" [(ngModel)]="editSpawnRate"
-                     min="0.01" max="100" step="0.1"/>
-            </div>
-            <div class="field">
-              <label class="field-lbl">SKU</label>
-              <input class="field-input" type="text" [(ngModel)]="editSku" maxlength="16"/>
-            </div>
-            <div class="field-row">
-              <label class="field-lbl">Enabled</label>
-              <button class="tog-btn" [class.on]="editEnabled" (click)="editEnabled = !editEnabled">
-                {{ editEnabled ? 'ON' : 'OFF' }}
-              </button>
-            </div>
-            <button class="save-btn" (click)="saveGenerator()">APPLY CHANGES</button>
-          </div>
-
-          <div class="panel-head"><span>PROPERTIES</span></div>
-          <div class="sec">
-            <div class="row"><div class="k">Weight</div><div class="v">{{ prop('weight') }} kg</div></div>
-            <div class="row"><div class="k">Size</div><div class="v">{{ prop('size') }}</div></div>
-            <div class="row"><div class="k">Grid</div><div class="v">({{ selected.gridX }}, {{ selected.gridY }})</div></div>
-            <div class="row"><div class="k">Facing</div><div class="v">{{ selected.facing }}</div></div>
+            <ng-container *ngFor="let prop of writableProps">
+              <div class="field" *ngIf="prop.type === 'float' || prop.type === 'int'">
+                <label class="field-lbl">{{ prop.displayName }}</label>
+                <input class="field-input" type="number"
+                       [min]="prop.min" [max]="prop.max"
+                       [step]="prop.type === 'float' ? 0.1 : 1"
+                       [(ngModel)]="editValues[prop.key]" />
+              </div>
+              <div class="field" *ngIf="prop.type === 'string'">
+                <label class="field-lbl">{{ prop.displayName }}</label>
+                <input class="field-input" type="text" [(ngModel)]="editValues[prop.key]" />
+              </div>
+              <div class="field-row" *ngIf="prop.type === 'bool'">
+                <label class="field-lbl">{{ prop.displayName }}</label>
+                <button class="tog-btn" [class.on]="editValues[prop.key] === 'true'"
+                        (click)="toggleBool(prop.key)">
+                  {{ editValues[prop.key] === 'true' ? 'ON' : 'OFF' }}
+                </button>
+              </div>
+              <div class="field" *ngIf="prop.type === 'enum'">
+                <label class="field-lbl">{{ prop.displayName }}</label>
+                <div class="facing-btns">
+                  <button *ngFor="let v of prop.enumValues"
+                          class="dbtn" [class.on]="editValues[prop.key] === v"
+                          (click)="editValues[prop.key] = v">
+                    {{ v.toUpperCase() }}
+                  </button>
+                </div>
+              </div>
+            </ng-container>
+            <button class="save-btn" (click)="save()">APPLY CHANGES</button>
           </div>
         </ng-container>
 
-        <!-- ── PACKAGE EXIT ──────────────────────────────── -->
-        <ng-container *ngIf="isExit">
+        <!-- ── Read-only metrics (schema-driven) ────────────────────────── -->
+        <ng-container *ngIf="readOnlyProps.length > 0">
           <div class="panel-head"><span>LIVE METRICS</span></div>
           <div class="sec metrics-sec">
-            <div class="metric-card">
-              <div class="metric-val">{{ prop('totalProcessed') || '0' }}</div>
-              <div class="metric-lbl">PROCESSED</div>
+            <div class="metric-card" *ngFor="let prop of readOnlyProps">
+              <div class="metric-val">{{ currentProps[prop.key] ?? '—' }}</div>
+              <div class="metric-lbl">{{ prop.displayName }}</div>
             </div>
-            <div class="metric-card">
-              <div class="metric-val">{{ prop('throughput') || '0.000' }}</div>
-              <div class="metric-lbl">THROUGHPUT <span class="metric-unit">pkg/s</span></div>
-            </div>
-            <div class="metric-card">
-              <div class="metric-val">{{ prop('avgFulfillmentTime') || '0.000' }}</div>
-              <div class="metric-lbl">AVG FULFILLMENT <span class="metric-unit">s</span></div>
-            </div>
-          </div>
-
-          <div class="panel-head"><span>PROPERTIES</span></div>
-          <div class="sec">
-            <div class="row"><div class="k">Grid</div><div class="v">({{ selected.gridX }}, {{ selected.gridY }})</div></div>
-            <div class="row"><div class="k">Facing</div><div class="v">{{ selected.facing }}</div></div>
           </div>
         </ng-container>
 
-        <!-- ── CONVEYORS ─────────────────────────────────── -->
-        <ng-container *ngIf="isConveyor">
-          <div class="panel-head"><span>CONFIG</span></div>
-          <div class="sec form-sec">
-            <div class="field">
-              <label class="field-lbl">Speed <span class="unit">cell/s</span></label>
-              <input class="field-input" type="number" [(ngModel)]="editSpeed"
-                     min="0.1" max="10" step="0.1"/>
-            </div>
-            <button class="save-btn" (click)="saveConveyor()">APPLY CHANGES</button>
-          </div>
-          <div class="panel-head"><span>PROPERTIES</span></div>
-          <div class="sec">
-            <div class="row"><div class="k">Grid</div><div class="v">({{ selected.gridX }}, {{ selected.gridY }})</div></div>
-            <div class="row"><div class="k">Facing</div><div class="v">{{ selected.facing }}</div></div>
-          </div>
-        </ng-container>
+        <!-- ── Position info ─────────────────────────────────────────────── -->
+        <div class="panel-head"><span>PROPERTIES</span></div>
+        <div class="sec">
+          <div class="row"><div class="k">Grid</div><div class="v">({{ selected.gridX }}, {{ selected.gridY }})</div></div>
+          <div class="row"><div class="k">Facing</div><div class="v">{{ selected.facing }}</div></div>
+        </div>
 
-        <!-- ── OTHER COMPONENTS ──────────────────────────── -->
-        <ng-container *ngIf="!isGenerator && !isExit && !isConveyor">
-          <div class="panel-head"><span>PROPERTIES</span></div>
-          <div class="sec">
-            <div class="row"><div class="k">Kind</div><div class="v">{{ selected.kind }}</div></div>
-            <div class="row"><div class="k">Grid</div><div class="v">({{ selected.gridX }}, {{ selected.gridY }})</div></div>
-            <div class="row"><div class="k">Facing</div><div class="v">{{ selected.facing }}</div></div>
-          </div>
-        </ng-container>
-
-        <!-- ── DELETE ────────────────────────────────────── -->
+        <!-- ── DELETE ────────────────────────────────────────────────────── -->
         <div class="sec">
           <button class="del-btn" (click)="deleteComponent()">DELETE COMPONENT</button>
         </div>
@@ -196,12 +153,10 @@ const KIND_LABELS: Record<string, string> = {
     }
     .insp-badge.info { color: var(--cyan); border-color: var(--cyan-dim); background: rgba(34,211,238,.06); }
 
-    /* Generator form */
     .form-sec { display: flex; flex-direction: column; gap: 8px; }
     .field { display: flex; flex-direction: column; gap: 3px; }
     .field-row { display: flex; justify-content: space-between; align-items: center; }
     .field-lbl { font-size: 9px; color: var(--text-3); letter-spacing: .04em; }
-    .unit, .metric-unit { font-size: 8px; color: var(--text-4); }
     .field-input {
       background: var(--bg-0);
       border: 1px solid var(--border-bright);
@@ -253,7 +208,22 @@ const KIND_LABELS: Record<string, string> = {
     }
     .del-btn:hover { background: rgba(248,113,113,.16); }
 
-    /* Exit metrics */
+    .facing-btns { display: flex; gap: 3px; }
+    .dbtn {
+      flex: 1;
+      padding: 4px 0;
+      border: 1px solid var(--border-bright);
+      background: transparent;
+      color: var(--text-3);
+      font-family: var(--mono);
+      font-size: 9px;
+      cursor: pointer;
+      letter-spacing: .04em;
+      transition: all .1s;
+    }
+    .dbtn.on { color: var(--cyan); border-color: var(--cyan-dim); background: rgba(34,211,238,.06); font-weight: 700; }
+    .dbtn:hover:not(.on) { background: var(--bg-2); color: var(--text-1); }
+
     .metrics-sec { display: flex; flex-direction: column; gap: 6px; }
     .metric-card {
       background: var(--bg-0);
@@ -279,51 +249,47 @@ const KIND_LABELS: Record<string, string> = {
 export class InspectorComponent implements OnChanges {
   @Input() selected: ComponentState | null = null;
 
-  private sim = inject(SimStateService);
+  private sim       = inject(SimStateService);
+  private schemaSvc = inject(SchemaService);
 
-  editSpawnRate = 1;
-  editSku = 'PKG';
-  editEnabled = true;
-  editSpeed = 1;
+  editValues: Record<string, string> = {};
 
   get kindLabel(): string {
-    return this.selected ? (KIND_LABELS[this.selected.kind] ?? this.selected.kind.toUpperCase()) : '';
+    return this.selected?.kind.toUpperCase().replace(/_/g, ' ') ?? '';
   }
 
-  get isGenerator(): boolean { return this.selected?.kind === 'package_generator'; }
-  get isExit():      boolean { return this.selected?.kind === 'package_exit'; }
-  get isConveyor():  boolean {
-    return this.selected?.kind === 'conveyor_oneway' || this.selected?.kind === 'conveyor_turn';
+  get writableProps(): PropertySchema[] {
+    return this.schemaSvc.getSchema(this.selected?.kind ?? '').filter(p => !p.isReadOnly);
+  }
+
+  get readOnlyProps(): PropertySchema[] {
+    return this.schemaSvc.getSchema(this.selected?.kind ?? '').filter(p => p.isReadOnly);
+  }
+
+  get currentProps(): Record<string, string> {
+    return this.selected?.properties ?? {};
   }
 
   ngOnChanges(): void {
-    const p = this.selected?.properties ?? {};
-    if (this.selected?.kind === 'package_generator') {
-      this.editSpawnRate = parseFloat(p['spawnRate'] ?? '1');
-      this.editSku       = p['sku'] ?? 'PKG';
-      this.editEnabled   = (p['enabled'] ?? 'true') !== 'false';
-    }
-    if (this.isConveyor) {
-      this.editSpeed = parseFloat(p['speed'] ?? '1');
+    this.editValues = {};
+    const schema  = this.schemaSvc.getSchema(this.selected?.kind ?? '');
+    const current = this.selected?.properties ?? {};
+    for (const prop of schema) {
+      if (!prop.isReadOnly)
+        this.editValues[prop.key] = current[prop.key] ?? prop.defaultValue ?? '';
     }
   }
 
-  prop(key: string): string {
-    return this.selected?.properties?.[key] ?? '';
+  toggleBool(key: string): void {
+    this.editValues[key] = this.editValues[key] === 'true' ? 'false' : 'true';
   }
 
-  saveGenerator(): void {
+  save(): void {
     if (!this.selected) return;
-    this.sim.configureComponent(this.selected.id, {
-      spawnRate: String(this.editSpawnRate),
-      sku:       this.editSku,
-      enabled:   this.editEnabled ? 'true' : 'false',
-    });
-  }
-
-  saveConveyor(): void {
-    if (!this.selected) return;
-    this.sim.configureComponent(this.selected.id, { speed: String(this.editSpeed) });
+    const props: Record<string, string> = {};
+    for (const [k, v] of Object.entries(this.editValues))
+      props[k] = String(v);
+    this.sim.configureComponent(this.selected.id, props);
   }
 
   deleteComponent(): void {

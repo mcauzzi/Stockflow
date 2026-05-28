@@ -13,6 +13,7 @@ import { EventLogComponent } from './features/event-log/event-log.component';
 import { OrdersViewComponent } from './features/orders-view/orders-view.component';
 import { MetricsViewComponent } from './features/metrics-view/metrics-view.component';
 import { StubViewComponent } from './features/stub-view/stub-view.component';
+import { ScenariosPanelComponent } from './features/scenarios-panel/scenarios-panel.component';
 import { ComponentState } from './core/models/protocol';
 import { genSpark } from './core/mock/sim-mock';
 
@@ -25,13 +26,15 @@ import { genSpark } from './core/mock/sim-mock';
     PaletteComponent, GridCanvasComponent, InspectorComponent,
     EventLogComponent,
     OrdersViewComponent, MetricsViewComponent, StubViewComponent,
+    ScenariosPanelComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App implements OnInit {
-  readonly activeTab      = signal<Tab>('OPERATE');
-  readonly selectedComp   = signal<ComponentState | null>(null);
+  readonly activeTab       = signal<Tab>('OPERATE');
+  readonly scenariosOpen   = signal(false);
+  readonly selectedComp    = signal<ComponentState | null>(null);
   readonly liveSelected   = computed(() => {
     const sel = this.selectedComp();
     if (!sel) return null;
@@ -41,6 +44,7 @@ export class App implements OnInit {
   readonly placeFacing    = signal<Direction>('North');
   readonly placeTurnSide  = signal<'Left' | 'Right'>('Right');
   readonly placeSpeed     = signal(1);
+  readonly placeMergeMode = signal<'alternating' | 'priority'>('alternating');
   readonly paused         = signal(false);
   readonly currentSpeed   = signal<SimSpeed>(1);
 
@@ -102,6 +106,10 @@ export class App implements OnInit {
     this.placeSpeed.set(speed);
   }
 
+  onPlaceMergeModeChange(mode: 'alternating' | 'priority'): void {
+    this.placeMergeMode.set(mode);
+  }
+
   @HostListener('document:keydown.escape')
   onEscape(): void {
     this.selectedTool.set(null);
@@ -112,8 +120,10 @@ export class App implements OnInit {
     if (!tool) return;
     const kind = tool.kind;
     const params: Record<string, unknown> = {};
-    if (kind === 'conveyor_turn') params['turn'] = this.placeTurnSide();
-    if (kind === 'conveyor_oneway' || kind === 'conveyor_turn') params['speed'] = this.placeSpeed();
+    if (kind === 'conveyor_turn') { params['turn'] = this.placeTurnSide(); params['speed'] = this.placeSpeed(); }
+    if (kind === 'conveyor_oneway') params['speed'] = this.placeSpeed();
+    if (kind === 'diverter')      { params['speed'] = this.placeSpeed(); params['side'] = this.placeTurnSide(); }
+    if (kind === 'merge')         { params['speed'] = this.placeSpeed(); params['mode'] = this.placeMergeMode(); params['side'] = this.placeTurnSide(); }
     this.sim.placeComponent(kind, cell.x, cell.y, this.placeFacing(),
       Object.keys(params).length ? params as any : undefined);
   }

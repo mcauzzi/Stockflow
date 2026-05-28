@@ -13,7 +13,7 @@ public class EntityManager
     public IReadOnlyCollection<SimEntity> GetAll() => _active.Values;
 
     public IEnumerable<SimEntity> GetByComponent(int componentId)
-        => _active.Values.Where(e => e.CurrentComponent.Id == componentId);
+        => _active.Values.Where(e => e.CurrentComponent?.Id == componentId);
 
     public SimEntity Spawn(string sku, float weight, float size, float entryTime,
                            ISimComponent startComponent, PortId startPort)
@@ -41,5 +41,17 @@ public class EntityManager
         entity.Reset();
         _pool.Enqueue(entity);
         return true;
+    }
+
+    // Svuota le entità attive (riusando il pool) preservando _nextId per
+    // evitare collisioni di ID con le entità segnalate da GetStateDelta.
+    public void Reset()
+    {
+        foreach (var entity in _active.Values)
+        {
+            entity.Reset();
+            _pool.Enqueue(entity);
+        }
+        _active.Clear();
     }
 }

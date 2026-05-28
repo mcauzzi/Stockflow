@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Options;
 using Stockflow.Protocol.Serialization;
@@ -5,6 +6,8 @@ using Stockflow.Simulation.Core;
 using Stockflow.Webserver.Configuration;
 using Stockflow.Webserver.Hosting;
 using Stockflow.Webserver.Queue;
+using Stockflow.Webserver.Scenarios;
+using Stockflow.Webserver.Sessions;
 using Stockflow.Webserver.WebSocket;
 
 MessagePackConfig.Initialize();
@@ -38,9 +41,26 @@ builder.Services.AddSingleton<SimulationEngine>(sp =>
     var cfg = sp.GetRequiredService<IOptions<ServerConfig>>().Value;
     return new SimulationEngine(cfg.GridWidth, cfg.GridLength, cfg.GridFloors);
 });
+builder.Services.AddSingleton<IScenarioRepository>(sp =>
+{
+    var cfg  = sp.GetRequiredService<IOptions<ServerConfig>>().Value;
+    var env  = sp.GetRequiredService<IHostEnvironment>();
+    var path = Path.IsPathRooted(cfg.ScenariosPath)
+        ? cfg.ScenariosPath
+        : Path.Combine(env.ContentRootPath, cfg.ScenariosPath);
+    return new FileScenarioRepository(path);
+});
+builder.Services.AddSingleton<ISessionManager, SessionManager>();
 builder.Services.AddHostedService<SimulationHostedService>();
 
-builder.Services.AddControllers();
+builder.Services
+    .AddControllers()
+    .AddJsonOptions(o =>
+    {
+        // Enum come stringa (es. SessionStatus → "Running"/"Terminated") per
+        // mantenere il payload REST stabile e self-describing per il client.
+        o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
 // Local mode: allow any origin so the Angular dev server (default :4200) can reach the REST API.
 // Enterprise mode would restrict this to known origins via config.

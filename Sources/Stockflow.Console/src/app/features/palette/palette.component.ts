@@ -55,16 +55,25 @@ export interface PaletteItem {
         </div>
       </div>
 
-      <!-- Turn side selector (shown only for conveyor_turn) -->
-      <div class="facing" *ngIf="isConveyorTurn">
-        <div class="facing-lbl">TURN SIDE</div>
+      <!-- Side selector (conveyor_turn, diverter, merge) -->
+      <div class="facing" *ngIf="hasLateralSide">
+        <div class="facing-lbl">SIDE</div>
         <div class="facing-btns">
           <button class="dbtn" [class.on]="selectedTurnSide === 'Left'"  title="Left turn"  (click)="setTurnSide('Left')">L</button>
           <button class="dbtn" [class.on]="selectedTurnSide === 'Right'" title="Right turn" (click)="setTurnSide('Right')">R</button>
         </div>
       </div>
 
-      <!-- Speed input (shown for conveyors) -->
+      <!-- Mode selector (shown only for merge) -->
+      <div class="facing" *ngIf="isMerge">
+        <div class="facing-lbl">MODE</div>
+        <div class="facing-btns">
+          <button class="dbtn" [class.on]="selectedMergeMode === 'alternating'" (click)="setMergeMode('alternating')">ALT</button>
+          <button class="dbtn" [class.on]="selectedMergeMode === 'priority'"    (click)="setMergeMode('priority')">PRI</button>
+        </div>
+      </div>
+
+      <!-- Speed input (shown for conveyors and merge) -->
       <div class="facing" *ngIf="isConveyor">
         <div class="facing-lbl">SPEED <span class="dim2">cell/s</span></div>
         <input class="speed-input" type="number"
@@ -183,16 +192,18 @@ export interface PaletteItem {
 })
 export class PaletteComponent {
   @Input()  selectedId: string | null = null;
-  @Output() itemSelect    = new EventEmitter<PaletteItem | null>();
-  @Output() facingChange  = new EventEmitter<Direction>();
-  @Output() turnSideChange = new EventEmitter<'Left' | 'Right'>();
-  @Output() speedChange   = new EventEmitter<number>();
+  @Output() itemSelect      = new EventEmitter<PaletteItem | null>();
+  @Output() facingChange    = new EventEmitter<Direction>();
+  @Output() turnSideChange  = new EventEmitter<'Left' | 'Right'>();
+  @Output() speedChange     = new EventEmitter<number>();
+  @Output() mergeModeChange = new EventEmitter<'alternating' | 'priority'>();
 
   readonly lib = COMPONENT_LIBRARY;
   readonly directions: Direction[] = ['North', 'East', 'South', 'West'];
   selectedFacing: Direction = 'North';
   selectedTurnSide: 'Left' | 'Right' = 'Right';
   selectedSpeed = 1;
+  selectedMergeMode: 'alternating' | 'priority' = 'alternating';
 
   get selectedItem(): PaletteItem | null {
     if (!this.selectedId) return null;
@@ -203,13 +214,14 @@ export class PaletteComponent {
     return null;
   }
 
-  get isConveyorTurn(): boolean {
-    return this.selectedItem?.kind === 'conveyor_turn';
-  }
+  get isConveyorTurn():  boolean { return this.selectedItem?.kind === 'conveyor_turn'; }
+  get isMerge():         boolean { return this.selectedItem?.kind === 'merge'; }
+  get isDiverter():      boolean { return this.selectedItem?.kind === 'diverter'; }
+  get hasLateralSide():  boolean { return this.isConveyorTurn || this.isDiverter || this.isMerge; }
 
   get isConveyor(): boolean {
     const kind = this.selectedItem?.kind;
-    return kind === 'conveyor_oneway' || kind === 'conveyor_turn';
+    return kind === 'conveyor_oneway' || kind === 'conveyor_turn' || kind === 'merge' || kind === 'diverter';
   }
 
   select(it: PaletteItem): void {
@@ -230,5 +242,10 @@ export class PaletteComponent {
   setSpeed(value: number): void {
     this.selectedSpeed = Math.max(0.1, Math.min(10, value));
     this.speedChange.emit(this.selectedSpeed);
+  }
+
+  setMergeMode(mode: 'alternating' | 'priority'): void {
+    this.selectedMergeMode = mode;
+    this.mergeModeChange.emit(mode);
   }
 }

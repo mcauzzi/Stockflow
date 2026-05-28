@@ -10,7 +10,7 @@ public class SimEntity
     public float   Size      { get; internal set; }
     public float   EntryTime { get; internal set; }
 
-    public ISimComponent  CurrentComponent     { get; set; } = null!;
+    public ISimComponent? CurrentComponent     { get; set; }
     public PortId         CurrentPort          { get; set; }
     public float          Progress             { get; set; }   // 0.0 ingresso → 1.0 uscita
 
@@ -23,7 +23,7 @@ public class SimEntity
     internal void Reset()
     {
         Sku                  = "";
-        CurrentComponent     = null!;
+        CurrentComponent     = null;
         DestinationComponent = null;
     }
 }

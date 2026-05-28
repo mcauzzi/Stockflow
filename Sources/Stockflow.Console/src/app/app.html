@@ -2,8 +2,14 @@
   [activeTab]="activeTab()"
   [connected]="sim.connected()"
   [restOnline]="sim.restOnline()"
-  (tabChange)="onTabChange($event)">
+  (tabChange)="onTabChange($event)"
+  (openScenarios)="scenariosOpen.set(true)">
 </app-topbar>
+
+<app-scenarios-panel
+  *ngIf="scenariosOpen()"
+  (close)="scenariosOpen.set(false)">
+</app-scenarios-panel>
 
 <app-kpi-strip
   [simClock]="sim.simClock()"
@@ -25,7 +31,8 @@
     (itemSelect)="onToolSelect($event)"
     (facingChange)="onFacingChange($event)"
     (turnSideChange)="onTurnSideChange($event)"
-    (speedChange)="onPlaceSpeedChange($event)">
+    (speedChange)="onPlaceSpeedChange($event)"
+    (mergeModeChange)="onPlaceMergeModeChange($event)">
   </app-palette>
 
   <app-grid-canvas

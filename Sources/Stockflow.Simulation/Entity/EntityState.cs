@@ -17,7 +17,7 @@ public sealed record EntityState
     {
         Id                 = e.Id,
         Sku                = e.Sku,
-        CurrentComponentId = e.CurrentComponent.Id,
+        CurrentComponentId = e.CurrentComponent?.Id ?? 0,
         CurrentPort        = e.CurrentPort,
         Progress           = e.Progress,
         Status             = e.Status,

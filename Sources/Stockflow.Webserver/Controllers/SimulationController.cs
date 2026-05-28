@@ -4,10 +4,10 @@ using Stockflow.Simulation.Commands;
 using Stockflow.Simulation.Component;
 using Stockflow.Simulation.Core;
 using Stockflow.Simulation.Grid;
+using Stockflow.Webserver.Configuration;
+using Stockflow.Webserver.Logging;
 using Stockflow.Webserver.Queue;
-using SimComponentType = Stockflow.Simulation.Component.ComponentType;
-using ISimComponent    = Stockflow.Simulation.Component.ISimComponent;
-using SimDirection     = Stockflow.Simulation.Component.Direction;
+using Stockflow.Webserver.Serialization;
 
 namespace Stockflow.Webserver.Controllers;
 
@@ -28,9 +28,6 @@ public sealed class SimulationController(
     IRestCommandQueue             queue,
     ILogger<SimulationController> logger) : ControllerBase
 {
-    // Mirrors SimulationHostedService.TimeScaleBySpeed — keep in sync until extracted to shared config.
-    private static readonly float[] TimeScaleBySpeed = [0f, 1f, 2f, 5f, 10f, 1f];
-
     // ── GET /api/sim/state ────────────────────────────────────────────────────
     [HttpGet("state")]
     public IActionResult GetState()
@@ -48,16 +45,16 @@ public sealed class SimulationController(
             timeScale      = engine.TimeScale,
             gridWidth      = engine.Grid.Width,
             gridLength     = engine.Grid.Length,
-            gridFloors     = engine.Grid.Height,
+            gridFloors     = engine.Grid.Floors,
             components     = components.Select(c => new
             {
                 id         = c.Id,
-                kind       = KindString(c.Type),
+                kind       = ComponentSerializer.KindString(c.Type),
                 gridX      = c.Position.X,
                 gridY      = c.Position.Y,
                 facing     = c.Facing.ToString(),
                 occupant   = c.Occupant?.Id,
-                properties = BuildProperties(c),
+                properties = ComponentSerializer.BuildProperties(c),
             }),
             entities = entities.Values.Select(e => new
             {
@@ -96,14 +93,14 @@ public sealed class SimulationController(
     [HttpPost("speed")]
     public IActionResult ChangeSpeed([FromBody] ChangeSpeedRequest req)
     {
-        if (req.Speed is < 0 or > 5)
+        if (req.Speed < SpeedTable.MinSpeed || req.Speed > SpeedTable.MaxSpeed)
         {
             logger.LogWarning("POST /api/sim/speed → 400 invalid speed={Speed}", req.Speed);
-            return BadRequest(new { success = false, errorMessage = "speed must be 0‥5" });
+            return BadRequest(new { success = false, errorMessage = $"speed must be {SpeedTable.MinSpeed}‥{SpeedTable.MaxSpeed}" });
         }
 
         var previous = engine.TimeScale;
-        engine.TimeScale = TimeScaleBySpeed[req.Speed];
+        engine.TimeScale = SpeedTable.TimeScaleFor(req.Speed);
 
         logger.LogInformation(
             "POST /api/sim/speed → speed={Speed} timeScale={Previous}→{TimeScale}",
@@ -116,20 +113,31 @@ public sealed class SimulationController(
     [HttpPost("components")]
     public IActionResult PlaceComponent([FromBody] PlaceComponentRequest req)
     {
-        var dir = ParseDirection(req.Facing);
+        var dir = DirectionParser.Parse(req.Facing);
         var pos = new GridCoord(req.GridX, req.GridY);
 
         ICommand? cmd = req.Kind switch
         {
-            "package_generator" => new PlacePackageGeneratorCommand(pos, dir,
+            ComponentKinds.PackageGenerator => new PlacePackageGeneratorCommand(pos, dir,
                 req.SpawnRate ?? 1f,
                 req.Sku       ?? "PKG",
                 req.Weight    ?? 1f,
                 req.Size      ?? 1f),
-            "package_exit"    => new PlacePackageExitCommand(pos, dir),
-            "conveyor_oneway" => new PlaceOneWayConveyorCommand(pos, dir, req.Speed ?? 1f),
-            "conveyor_turn"   => new PlaceConveyorTurnCommand(pos, dir,
+            ComponentKinds.PackageExit    => new PlacePackageExitCommand(pos, dir),
+            ComponentKinds.OneWayConveyor => new PlaceOneWayConveyorCommand(pos, dir, req.Speed ?? 1f),
+            ComponentKinds.ConveyorTurn   => new PlaceConveyorTurnCommand(pos, dir,
                 req.Turn == "Left" ? TurnSide.Left : TurnSide.Right,
+                req.Speed ?? 1f),
+            ComponentKinds.MergeLogic => new PlaceMergeLogicCommand(
+                pos,
+                dir,
+                req.Mode == "priority" ? MergeMode.Priority : MergeMode.Alternating,
+                req.Side == "Left"     ? TurnSide.Left       : TurnSide.Right,
+                req.Speed ?? 1f),
+            ComponentKinds.DiverterLogic => new PlaceDiverterLogicCommand(
+                pos,
+                dir,
+                req.Side == "Left" ? TurnSide.Left : TurnSide.Right,
                 req.Speed ?? 1f),
             _ => null,
         };
@@ -138,7 +146,7 @@ public sealed class SimulationController(
         {
             logger.LogWarning(
                 "POST /api/sim/components → 400 unknown kind={Kind}",
-                req.Kind);
+                LogSanitizer.Clean(req.Kind));
             return BadRequest(new { success = false, errorMessage = $"Unknown component kind: {req.Kind}" });
         }
 
@@ -146,7 +154,7 @@ public sealed class SimulationController(
 
         logger.LogInformation(
             "POST /api/sim/components → enqueued {Kind} at ({X},{Y}) facing={Facing}",
-            req.Kind, req.GridX, req.GridY, req.Facing ?? "North");
+            LogSanitizer.Clean(req.Kind), req.GridX, req.GridY, LogSanitizer.Clean(req.Facing ?? "North"));
 
         return Accepted();
     }
@@ -165,7 +173,7 @@ public sealed class SimulationController(
 
         logger.LogInformation(
             "PUT /api/sim/components/{Id} → enqueued configure [{Keys}]",
-            id, string.Join(", ", props.Keys));
+            id, LogSanitizer.Clean(string.Join(", ", props.Keys)));
 
         return Accepted();
     }
@@ -180,56 +188,32 @@ public sealed class SimulationController(
         return Accepted();
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private static SimDirection ParseDirection(string? s) => s switch
+    // ── GET /api/sim/schemas ──────────────────────────────────────────────────
+    /// <summary>
+    /// Returns the ConfigSchema for each registered component kind.
+    /// The frontend uses this to generate inspector forms dynamically.
+    /// </summary>
+    [HttpGet("schemas")]
+    public IActionResult GetSchemas()
     {
-        "East"  => SimDirection.East,
-        "South" => SimDirection.South,
-        "West"  => SimDirection.West,
-        _       => SimDirection.North,
-    };
-
-    private static string KindString(SimComponentType type) => type switch
-    {
-        SimComponentType.OneWayConveyor   => ComponentKinds.OneWayConveyor,
-        SimComponentType.ConveyorTurn     => "conveyor_turn",
-        SimComponentType.PackageGenerator => "package_generator",
-        SimComponentType.PackageExit      => "package_exit",
-        _                                 => type.ToString().ToLowerInvariant(),
-    };
-
-    private static Dictionary<string, string>? BuildProperties(ISimComponent c)
-    {
-        if (c is PackageGenerator gen)
-            return new()
+        var registry = ComponentSchemaRegistry.GetAll();
+        return Ok(registry.Select(kv => new
+        {
+            kind   = kv.Key,
+            schema = kv.Value.Select(s => new
             {
-                ["spawnRate"] = gen.SpawnRate.ToString("F3"),
-                ["sku"]       = gen.Sku,
-                ["weight"]    = gen.Weight.ToString("F3"),
-                ["size"]      = gen.Size.ToString("F3"),
-                ["enabled"]   = gen.IsEnabled ? "true" : "false",
-            };
-        if (c is PackageExit exit)
-            return new()
-            {
-                ["totalProcessed"]     = exit.TotalProcessed.ToString(),
-                ["throughput"]         = exit.Throughput.ToString("F3"),
-                ["avgFulfillmentTime"] = exit.AvgFulfillmentTime.ToString("F3"),
-            };
-        if (c is ConveyorTurn turn)
-            return new()
-            {
-                ["turn"]  = turn.Turn == TurnSide.Right ? "right" : "left",
-                ["speed"] = turn.Speed.ToString("F3"),
-            };
-        if (c is OneWayConveyor conv)
-            return new()
-            {
-                ["speed"] = conv.Speed.ToString("F3"),
-            };
-        return null;
+                key          = s.Key,
+                displayName  = s.DisplayName,
+                type         = s.Type.ToString().ToLowerInvariant(),
+                defaultValue = s.DefaultValue,
+                min          = s.Min,
+                max          = s.Max,
+                enumValues   = s.EnumValues,
+                isReadOnly   = s.IsReadOnly,
+            }),
+        }));
     }
+
 }
 
 public sealed record ChangeSpeedRequest(int Speed);
@@ -244,4 +228,6 @@ public sealed record PlaceComponentRequest(
     float?  Weight    = null,
     float?  Size      = null,
     string? Turn      = null,
-    float?  Speed     = null);
+    float?  Speed     = null,
+    string? Mode      = null,
+    string? Side      = null);

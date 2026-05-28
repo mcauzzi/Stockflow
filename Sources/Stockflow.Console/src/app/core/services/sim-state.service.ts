@@ -2,13 +2,14 @@ import { Injectable, OnDestroy, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { WebSocketService } from './websocket.service';
+import { SchemaService } from './schema.service';
 import {
   ComponentState, Direction, EntityState, MetricsSnapshot, SimEvent, SimSpeed,
   StateDeltaMessage, FullStateMessage,
 } from '../models/protocol';
 import { MockEvent, INITIAL_EVENTS, genSpark } from '../mock/sim-mock';
+import { REST_BASE } from '../config';
 
-const REST_BASE = 'http://localhost:9601';
 const MAX_EVENTS = 120;
 
 @Injectable({ providedIn: 'root' })
@@ -55,6 +56,7 @@ export class SimStateService implements OnDestroy {
   constructor(
     private ws: WebSocketService,
     private http: HttpClient,
+    private schemas: SchemaService,
   ) {
     this._init();
   }
@@ -135,6 +137,7 @@ export class SimStateService implements OnDestroy {
       next: () => {
         this.restOnline.set(true);
         this._loadInitialState();
+        this.schemas.load();
       },
       error: () => {
         this.restOnline.set(false);

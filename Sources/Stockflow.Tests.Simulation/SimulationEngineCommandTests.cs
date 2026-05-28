@@ -153,7 +153,7 @@ public class SimulationEngineCommandTests
         engine.ProcessCommand(new PlacePackageExitCommand(new GridCoord(0, 0), Direction.North));
         var id = engine.State.Components[0].Id;
 
-        // PackageExit has no configurable parameters
+        // PackageExit has no configurable parameters — unknown keys are rejected
         var result = engine.ProcessCommand(new ConfigureComponentCommand(id,
             new Dictionary<string, string> { ["anything"] = "1" }));
 
