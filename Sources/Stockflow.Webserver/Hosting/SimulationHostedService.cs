@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Stockflow.Protocol.Messages;
 using Stockflow.Simulation.Commands;
@@ -150,8 +151,32 @@ public sealed class SimulationHostedService : BackgroundService
                 .Select(id => ToProtoComponent(byId[id]))],
             RemovedComponentIds = [..delta.RemovedComponentIds],
             UpdatedComponents   = updatedComponents,
+            Events              = [..delta.Events.Select(e => ToProtoEvent(e, delta.SimulationTime))],
         };
     }
+
+    // Wire-stable snake_case identifiers for simulation event kinds. EventType is a string
+    // (not an enum) on the protocol so new kinds ship without bumping the wire format; the
+    // Angular console already keys off these values (e.g. "conveyor_jammed"). Never rename.
+    private static string EventTypeString(SimulationEventType type) => type switch
+    {
+        SimulationEventType.EntityTransferred => "entity_transferred",
+        SimulationEventType.ConveyorJammed    => "conveyor_jammed",
+        SimulationEventType.ComponentError    => "component_error",
+        _                                     => type.ToString(),
+    };
+
+    private static SimEvent ToProtoEvent(SimulationEvent e, float simTime) => new()
+    {
+        EventType   = EventTypeString(e.Type),
+        SimTime     = simTime,
+        PayloadJson = JsonSerializer.Serialize(new
+        {
+            entityId    = e.EntityId,
+            componentId = e.ComponentId,
+            message     = e.Message,
+        }),
+    };
 
     private FullStateMessage BuildFullStateMessage()
     {
