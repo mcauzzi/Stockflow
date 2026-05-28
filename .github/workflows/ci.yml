@@ -5,15 +5,8 @@ name: CI
 # La build Unity non è inclusa (troppo pesante per la CI iniziale).
 
 on:
-  push:
-    branches: ['**']
   pull_request:
     branches: [main, develop]
-
-# Evita run duplicati sullo stesso ref (push + eventuale PR).
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   build-test:
