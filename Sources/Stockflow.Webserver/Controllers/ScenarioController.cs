@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Stockflow.Webserver.Logging;
 using Stockflow.Webserver.Scenarios;
 
 namespace Stockflow.Webserver.Controllers;
@@ -29,14 +30,14 @@ public sealed class ScenarioController(
             var scenario = repository.Get(id);
             if (scenario is null)
             {
-                logger.LogDebug("GET /api/scenarios/{Id} → 404", id);
+                logger.LogDebug("GET /api/scenarios/{Id} → 404", LogSanitizer.Clean(id));
                 return NotFound(new { errorMessage = $"Scenario '{id}' not found" });
             }
             return Ok(scenario);
         }
         catch (InvalidScenarioIdException ex)
         {
-            logger.LogWarning("GET /api/scenarios/{Id} → 400 invalid id", id);
+            logger.LogWarning("GET /api/scenarios/{Id} → 400 invalid id", LogSanitizer.Clean(id));
             return BadRequest(new { errorMessage = ex.Message });
         }
     }
@@ -47,17 +48,17 @@ public sealed class ScenarioController(
         try
         {
             repository.Create(scenario);
-            logger.LogInformation("POST /api/scenarios → created '{Id}'", scenario.Id);
+            logger.LogInformation("POST /api/scenarios → created '{Id}'", LogSanitizer.Clean(scenario.Id));
             return CreatedAtAction(nameof(Get), new { id = scenario.Id }, scenario);
         }
         catch (InvalidScenarioIdException ex)
         {
-            logger.LogWarning("POST /api/scenarios → 400 invalid id '{Id}'", scenario.Id);
+            logger.LogWarning("POST /api/scenarios → 400 invalid id '{Id}'", LogSanitizer.Clean(scenario.Id));
             return BadRequest(new { errorMessage = ex.Message });
         }
         catch (ScenarioAlreadyExistsException ex)
         {
-            logger.LogWarning("POST /api/scenarios → 409 '{Id}' already exists", scenario.Id);
+            logger.LogWarning("POST /api/scenarios → 409 '{Id}' already exists", LogSanitizer.Clean(scenario.Id));
             return Conflict(new { errorMessage = ex.Message });
         }
     }
@@ -67,14 +68,14 @@ public sealed class ScenarioController(
     {
         if (!string.Equals(id, scenario.Id, StringComparison.Ordinal))
         {
-            logger.LogWarning("PUT /api/scenarios/{Id} → 400 body id '{BodyId}' mismatch", id, scenario.Id);
+            logger.LogWarning("PUT /api/scenarios/{Id} → 400 body id '{BodyId}' mismatch", LogSanitizer.Clean(id), LogSanitizer.Clean(scenario.Id));
             return BadRequest(new { errorMessage = $"Body id '{scenario.Id}' does not match route id '{id}'" });
         }
 
         try
         {
             repository.Update(scenario);
-            logger.LogInformation("PUT /api/scenarios/{Id} → updated", id);
+            logger.LogInformation("PUT /api/scenarios/{Id} → updated", LogSanitizer.Clean(id));
             return Ok(scenario);
         }
         catch (InvalidScenarioIdException ex)
@@ -95,10 +96,10 @@ public sealed class ScenarioController(
         {
             if (!repository.Delete(id))
             {
-                logger.LogWarning("DELETE /api/scenarios/{Id} → 404", id);
+                logger.LogWarning("DELETE /api/scenarios/{Id} → 404", LogSanitizer.Clean(id));
                 return NotFound(new { errorMessage = $"Scenario '{id}' not found" });
             }
-            logger.LogInformation("DELETE /api/scenarios/{Id} → deleted", id);
+            logger.LogInformation("DELETE /api/scenarios/{Id} → deleted", LogSanitizer.Clean(id));
             return NoContent();
         }
         catch (InvalidScenarioIdException ex)
