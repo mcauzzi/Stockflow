@@ -107,7 +107,7 @@ public sealed class SessionController(
                 {
                     logger.LogWarning(
                         "Scenario '{Sid}': skipped preplaced #{Index} unknown type '{Type}'",
-                        scenario.Id, i, pp.Type);
+                        LogSanitizer.Clean(scenario.Id), i, LogSanitizer.Clean(pp.Type));
                     continue;
                 }
                 preplaced.Add(cmd);

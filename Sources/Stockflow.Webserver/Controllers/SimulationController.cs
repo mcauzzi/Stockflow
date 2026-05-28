@@ -5,6 +5,7 @@ using Stockflow.Simulation.Component;
 using Stockflow.Simulation.Core;
 using Stockflow.Simulation.Grid;
 using Stockflow.Webserver.Configuration;
+using Stockflow.Webserver.Logging;
 using Stockflow.Webserver.Queue;
 using Stockflow.Webserver.Serialization;
 
@@ -145,7 +146,7 @@ public sealed class SimulationController(
         {
             logger.LogWarning(
                 "POST /api/sim/components → 400 unknown kind={Kind}",
-                req.Kind);
+                LogSanitizer.Clean(req.Kind));
             return BadRequest(new { success = false, errorMessage = $"Unknown component kind: {req.Kind}" });
         }
 
@@ -153,7 +154,7 @@ public sealed class SimulationController(
 
         logger.LogInformation(
             "POST /api/sim/components → enqueued {Kind} at ({X},{Y}) facing={Facing}",
-            req.Kind, req.GridX, req.GridY, req.Facing ?? "North");
+            LogSanitizer.Clean(req.Kind), req.GridX, req.GridY, LogSanitizer.Clean(req.Facing ?? "North"));
 
         return Accepted();
     }
@@ -172,7 +173,7 @@ public sealed class SimulationController(
 
         logger.LogInformation(
             "PUT /api/sim/components/{Id} → enqueued configure [{Keys}]",
-            id, string.Join(", ", props.Keys));
+            id, LogSanitizer.Clean(string.Join(", ", props.Keys)));
 
         return Accepted();
     }
