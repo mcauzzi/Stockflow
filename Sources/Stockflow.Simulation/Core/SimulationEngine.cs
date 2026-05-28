@@ -74,10 +74,27 @@ public class SimulationEngine
         Clock.Advance(deltaTime);
         foreach (var component in State.Components)
         {
-            component.Tick(deltaTime);
-            _pendingEvents.AddRange(component.PendingEvents);
-            foreach (var module in component.Modules)
-                module.OnTick(deltaTime);
+            try
+            {
+                component.Tick(deltaTime);
+                _pendingEvents.AddRange(component.PendingEvents);
+                foreach (var module in component.Modules)
+                    module.OnTick(deltaTime);
+            }
+            catch (Exception ex)
+            {
+                // Isola il guasto: un componente che lancia non deve fermare l'intero
+                // tick loop e con esso la simulazione di tutti gli altri componenti.
+                // L'errore viene propagato in-band come evento nel delta, così il
+                // webserver (che ha il logging) può registrarlo senza che la
+                // simulazione dipenda da un framework di logging.
+                _pendingEvents.Add(new SimulationEvent
+                {
+                    Type        = SimulationEventType.ComponentError,
+                    ComponentId = component.Id,
+                    Message     = ex.Message,
+                });
+            }
         }
     }
 

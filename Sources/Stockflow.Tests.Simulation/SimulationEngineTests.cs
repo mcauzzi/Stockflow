@@ -39,6 +39,55 @@ public class SimulationEngineTests
         Assert.Equal(1, stub2.TickCount);
     }
 
+    // A component whose Tick always throws — used to verify fault isolation in the tick loop.
+    private sealed class ThrowingComponent(int id) : ISimComponent
+    {
+        public int                             Id       { get; } = id;
+        public GridCoord                       Position => default;
+        public Direction                       Facing   => Direction.North;
+        public ComponentType                   Type     => ComponentType.OneWayConveyor;
+        public IReadOnlyList<IComponentModule> Modules  => [];
+        public SimEntity?                      Occupant => null;
+        public IReadOnlyList<Port>             Ports    => [];
+        public IReadOnlyList<SimulationEvent>  PendingEvents => [];
+        public IReadOnlyList<PropertySchema>   ConfigSchema  => [];
+        public string? ApplyConfig(IReadOnlyDictionary<string, string> properties) => null;
+        public Dictionary<string, string> ExportProperties() => [];
+        public bool SetFacing(Direction newFacing) => false;
+        public bool TryAccept(SimEntity entity, PortId fromPort) => false;
+        public void Tick(float deltaTime) => throw new InvalidOperationException("boom");
+    }
+
+    [Fact]
+    public void Tick_WhenComponentThrows_DoesNotCrashLoopAndTicksOthers()
+    {
+        var engine    = MakeEngine();
+        var throwing  = new ThrowingComponent(1);
+        var healthy   = new StubComponent(2);
+        engine.State.Components.Add(throwing);
+        engine.State.Components.Add(healthy);
+
+        var exception = Record.Exception(() => engine.Tick(1f));
+
+        Assert.Null(exception);                 // the loop must not propagate the fault
+        Assert.Equal(1, healthy.TickCount);     // a later component still ticks
+    }
+
+    [Fact]
+    public void Tick_WhenComponentThrows_EmitsComponentErrorEvent()
+    {
+        var engine = MakeEngine();
+        engine.State.Components.Add(new ThrowingComponent(99));
+
+        engine.Tick(1f);
+        var delta = engine.GetStateDelta();
+
+        Assert.Contains(delta.Events,
+            e => e.Type == SimulationEventType.ComponentError
+              && e.ComponentId == 99
+              && e.Message == "boom");
+    }
+
     [Fact]
     public void GetStateDelta_AfterAddingComponent_ReportsAdded()
     {
