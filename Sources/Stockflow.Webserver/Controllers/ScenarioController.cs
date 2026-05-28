@@ -84,7 +84,7 @@ public sealed class ScenarioController(
         }
         catch (ScenarioNotFoundException ex)
         {
-            logger.LogWarning("PUT /api/scenarios/{Id} → 404", id);
+            logger.LogWarning("PUT /api/scenarios/{Id} → 404", LogSanitizer.Clean(id));
             return NotFound(new { errorMessage = ex.Message });
         }
     }
