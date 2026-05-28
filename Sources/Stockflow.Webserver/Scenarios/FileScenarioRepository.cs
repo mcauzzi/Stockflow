@@ -84,7 +84,20 @@ public sealed partial class FileScenarioRepository : IScenarioRepository
         }
     }
 
-    private string PathFor(string id) => Path.Combine(_scenariosPath, $"{id}.json");
+    private string PathFor(string id)
+    {
+        var root      = Path.GetFullPath(_scenariosPath);
+        var candidate = Path.GetFullPath(Path.Combine(root, $"{id}.json"));
+
+        var rootWithSep = root.EndsWith(Path.DirectorySeparatorChar)
+            ? root
+            : root + Path.DirectorySeparatorChar;
+
+        if (!candidate.StartsWith(rootWithSep, StringComparison.Ordinal))
+            throw new InvalidScenarioIdException(id);
+
+        return candidate;
+    }
 
     private static Scenario? ReadFile(string path)
     {
