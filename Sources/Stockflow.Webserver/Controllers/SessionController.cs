@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Stockflow.Simulation.Commands;
 using Stockflow.Simulation.Grid;
+using Stockflow.Webserver.Logging;
 using Stockflow.Webserver.Queue;
 using Stockflow.Webserver.Scenarios;
 using Stockflow.Webserver.Serialization;
@@ -83,7 +84,7 @@ public sealed class SessionController(
 
         if (scenario is null)
         {
-            logger.LogWarning("POST /api/sessions/{Id}/scenario/load → 404 scenario '{Sid}'", id, req.ScenarioId);
+            logger.LogWarning("POST /api/sessions/{Id}/scenario/load → 404 scenario '{Sid}'", id, LogSanitizer.Clean(req.ScenarioId));
             return NotFound(new { errorMessage = $"Scenario '{req.ScenarioId}' not found" });
         }
 
