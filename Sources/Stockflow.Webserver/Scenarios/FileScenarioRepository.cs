@@ -86,8 +86,13 @@ public sealed partial class FileScenarioRepository : IScenarioRepository
 
     private string PathFor(string id)
     {
+        // ValidateId already guarantees the id has no path separators, but Path.GetFileName
+        // is an explicit, analyzer-recognized barrier: it strips any directory component so a
+        // crafted id can never escape the scenarios root. The canonicalized containment check
+        // is kept as belt-and-suspenders.
+        var fileName  = Path.GetFileName($"{id}.json");
         var root      = Path.GetFullPath(_scenariosPath);
-        var candidate = Path.GetFullPath(Path.Combine(root, $"{id}.json"));
+        var candidate = Path.GetFullPath(Path.Combine(root, fileName));
 
         var rootWithSep = root.EndsWith(Path.DirectorySeparatorChar)
             ? root
