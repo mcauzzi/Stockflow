@@ -118,14 +118,16 @@ Stockflow.Webserver
 
 Issues tracked at `mcauzzi/Stockflow`. Organised by milestone: F0 (foundations, current), F1A–D, F2, F3.
 
-**Branch workflow:** feature branches go through `develop` first; only after testing on develop does the work land on `main`. Always create feature branches from `origin/develop` after a `git fetch`:
+**Branch workflow:** feature branches go through `develop` first; only after testing on develop does the work land on `main`. Always create feature branches from `origin/develop` after a `git fetch`, using `--no-track` so the new branch does **not** set `develop` as its upstream:
 
 ```bash
 git fetch origin develop
-git checkout -b claude/issue-N-short-desc origin/develop
+git checkout -b claude/issue-N-short-desc --no-track origin/develop
 ```
 
-Once the branch is reviewed and tested, it is merged into `develop`. `develop` is then merged into `main` — never merge feature branches directly to `main`.
+**Never set `develop` (or `main`) as the upstream/remote of a feature branch.** Without `--no-track`, `git checkout -b … origin/develop` makes the branch track `origin/develop`, so a bare `git push` would target develop. The feature branch must push to its own remote ref (`git push -u origin <branch>`) and reach develop only via PR.
+
+Once the branch is reviewed and tested, it is merged into `develop` (via PR). `develop` is then merged into `main` — never merge feature branches directly to `main`.
 
 ### Documentation
 
