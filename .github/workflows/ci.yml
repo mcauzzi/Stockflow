@@ -1,0 +1,41 @@
+name: CI
+
+# Pipeline base (issue #21): build dell'intera solution .NET, run dei test xUnit
+# e pubblicazione della DLL Protocol come artefatto per il client Unity.
+# La build Unity non è inclusa (troppo pesante per la CI iniziale).
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build-test:
+    name: Build & Test (.NET 10)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Stockflow.slnx
+
+      - name: Build (Release)
+        run: dotnet build Stockflow.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test Sources/Stockflow.Tests.Simulation/Stockflow.Tests.Simulation.csproj --configuration Release --no-build --verbosity normal
+
+      - name: Publish Protocol DLL (for Unity client)
+        run: dotnet publish Sources/Stockflow.Protocol/Stockflow.Protocol.csproj --configuration Release --output ./artifacts/protocol
+
+      - name: Upload Protocol artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stockflow-protocol
+          path: ./artifacts/protocol/Stockflow.Protocol.dll
+          if-no-files-found: error

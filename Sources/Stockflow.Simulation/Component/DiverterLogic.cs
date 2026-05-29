@@ -118,7 +118,7 @@ public class DiverterLogic : ISimComponent
         _pendingEvents.Clear();
         if (Occupant == null) return;
 
-        if (Occupant.Progress < 1.0f)
+        if (!SimMath.ProgressComplete(Occupant.Progress))
         {
             Occupant.Progress = MathF.Min(Occupant.Progress + Speed * deltaTime, 1.0f);
             return;
